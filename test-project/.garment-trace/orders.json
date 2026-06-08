@@ -1,6 +1,6 @@
 [
   {
-    "id": "ORD-MQ5J8OC67SH5FD",
+    "id": "ORD-MQ5JYX4YL4FCYU",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "styleName": "男士圆领短袖T恤",
@@ -22,12 +22,12 @@
     "season": "2026SS",
     "remark": "经典款圆领T恤",
     "status": "REWORKING",
-    "createdAt": "2026-06-08T18:16:39.223Z",
-    "updatedAt": "2026-06-08T18:16:42.250Z",
+    "createdAt": "2026-06-08T18:37:03.682Z",
+    "updatedAt": "2026-06-08T18:37:06.710Z",
     "amount": 127500
   },
   {
-    "id": "ORD-MQ5J8OF03CMU4F",
+    "id": "ORD-MQ5JYX7PLY5LS0",
     "orderNo": "PO2026002",
     "styleNo": "JX-B002",
     "styleName": "女士收腰连衣裙",
@@ -48,12 +48,12 @@
     "season": "2026SS",
     "remark": "雪纺碎花连衣裙",
     "status": "CREATED",
-    "createdAt": "2026-06-08T18:16:39.325Z",
-    "updatedAt": "2026-06-08T18:16:39.518Z",
+    "createdAt": "2026-06-08T18:37:03.782Z",
+    "updatedAt": "2026-06-08T18:37:03.970Z",
     "amount": 204000
   },
   {
-    "id": "ORD-MQ5J8OHL3RDPH2",
+    "id": "ORD-MQ5JYXAE59JNRJ",
     "orderNo": "PO2026003",
     "styleNo": "JX-C003",
     "styleName": "儿童纯棉卫衣套装",
@@ -76,8 +76,8 @@
     "season": "2026AW",
     "remark": "秋冬毛圈套装",
     "status": "CREATED",
-    "createdAt": "2026-06-08T18:16:39.417Z",
-    "updatedAt": "2026-06-08T18:16:39.519Z",
+    "createdAt": "2026-06-08T18:37:03.879Z",
+    "updatedAt": "2026-06-08T18:37:03.971Z",
     "amount": 336000
   }
 ]

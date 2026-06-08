@@ -62,6 +62,7 @@ function exportInspectionPackage(storage, opts) {
   const inspections = storage.findInspectionsByOrder(orderNo);
   const boxes = storage.findBoxesByOrder(orderNo);
   const traceCodes = storage.findTraceCodesByOrder(orderNo);
+  const scanLogs = storage.findScanLogsByOrder(orderNo);
   const stats = calculateReorderRate(inspections);
 
   const defectMap = {};
@@ -119,37 +120,42 @@ function exportInspectionPackage(storage, opts) {
       traceCodes: traceCodes.map(c => ({ ...c, id: undefined })),
       missingTraceCodeBoxes: boxes.filter(b => !traceCodes.find(c => c.boxNo === b.boxNo)).map(b => b.boxNo)
     },
+    scanLogs: {
+      totalScanCount: scanLogs.length,
+      uniqueCodesScanned: [...new Set(scanLogs.map(l => l.traceCode))].length,
+      logs: scanLogs.map(l => ({ ...l, id: undefined }))
+    },
     generatedAt: new Date().toISOString()
   };
 
   const jsonPath = path.join(outputDir, `inspection-report-${orderNo}.json`);
   fs.writeFileSync(jsonPath, JSON.stringify(summary, null, 2), 'utf-8');
-  printSuccess(`[1/8] 检验报告 JSON: ${path.basename(jsonPath)}`);
+  printSuccess(`[1/9] 检验报告 JSON: ${path.basename(jsonPath)}`);
 
   const csvContent = generateInspectionCSV(summary);
   const csvPath = path.join(outputDir, `inspection-report-${orderNo}.csv`);
   fs.writeFileSync(csvPath, '\uFEFF' + csvContent, 'utf-8');
-  printSuccess(`[2/8] 检验数据 CSV: ${path.basename(csvPath)}`);
+  printSuccess(`[2/9] 检验数据 CSV: ${path.basename(csvPath)}`);
 
   const boxesCSV = generateBoxesCSV(boxes);
   const boxesCsvPath = path.join(outputDir, `packing-list-${orderNo}.csv`);
   fs.writeFileSync(boxesCsvPath, '\uFEFF' + boxesCSV, 'utf-8');
-  printSuccess(`[3/8] 装箱单 CSV: ${path.basename(boxesCsvPath)}`);
+  printSuccess(`[3/9] 装箱单 CSV: ${path.basename(boxesCsvPath)}`);
 
   const defectsCSV = generateDefectsCSV(inspections);
   const defectsCsvPath = path.join(outputDir, `defect-summary-${orderNo}.csv`);
   fs.writeFileSync(defectsCsvPath, '\uFEFF' + defectsCSV, 'utf-8');
-  printSuccess(`[4/8] 疵点汇总 CSV: ${path.basename(defectsCsvPath)}`);
+  printSuccess(`[4/9] 疵点汇总 CSV: ${path.basename(defectsCsvPath)}`);
 
   const chainCSV = generateBatchTraceChainCSV(summary, materials, cuts, boxes, traceCodes);
   const chainCsvPath = path.join(outputDir, `batch-tracechain-${orderNo}.csv`);
   fs.writeFileSync(chainCsvPath, '\uFEFF' + chainCSV, 'utf-8');
-  printSuccess(`[5/8] 批次追溯链 CSV: ${path.basename(chainCsvPath)}`);
+  printSuccess(`[5/9] 批次追溯链 CSV: ${path.basename(chainCsvPath)}`);
 
   const reworkCSV = generateReworkAnalysisCSV(summary, inspections, order);
   const reworkCsvPath = path.join(outputDir, `rework-analysis-${orderNo}.csv`);
   fs.writeFileSync(reworkCsvPath, '\uFEFF' + reworkCSV, 'utf-8');
-  printSuccess(`[6/8] 返工率分析 CSV: ${path.basename(reworkCsvPath)}`);
+  printSuccess(`[6/9] 返工率分析 CSV: ${path.basename(reworkCsvPath)}`);
 
   if (traceCodes.length === 0 && opts.generateCodes) {
     printInfo('批量生成追溯码...');
@@ -171,18 +177,30 @@ function exportInspectionPackage(storage, opts) {
       tsv += `${c.code}\t${c.orderNo}\t${c.styleNo}\t${c.boxNo}\t${formatDateTime(c.createdAt)}\n`;
     });
     fs.writeFileSync(codesTsvPath, tsv, 'utf-8');
-    printSuccess(`[7/8] 追溯码清单 TSV: ${path.basename(codesTsvPath)}`);
+    printSuccess(`[7/9] 追溯码清单 TSV: ${path.basename(codesTsvPath)}`);
     summary.traceability.totalTraceCodes = latestCodes.length;
     summary.traceability.traceCodes = latestCodes.map(c => ({ ...c, id: undefined }));
     summary.traceability.missingTraceCodeBoxes = boxes.filter(b => !latestCodes.find(c => c.boxNo === b.boxNo)).map(b => b.boxNo);
   } else {
-    printWarning(`[7/8] 追溯码清单: 暂无追溯码 (使用 --generateCodes 自动生成)`);
+    printWarning(`[7/9] 追溯码清单: 暂无追溯码 (使用 --generateCodes 自动生成)`);
   }
 
-  const readme = generateClientSummary(summary, order, latestCodes, project);
+  if (scanLogs.length > 0) {
+    const scanTsvPath = path.join(outputDir, `scan-logs-${orderNo}.tsv`);
+    let scanTsv = '扫码时间\t追溯码\t箱号\t备注\n';
+    scanLogs.slice().sort((a, b) => new Date(b.scannedAt) - new Date(a.scannedAt)).forEach(l => {
+      scanTsv += `${formatDateTime(l.scannedAt)}\t${l.traceCode}\t${l.boxNo || ''}\t${l.note || ''}\n`;
+    });
+    fs.writeFileSync(scanTsvPath, scanTsv, 'utf-8');
+    printSuccess(`[8/9] 扫码记录清单 TSV: ${path.basename(scanTsvPath)} (${scanLogs.length}次扫码)`);
+  } else {
+    printInfo(`[8/9] 扫码记录清单: 暂无扫码记录`);
+  }
+
+  const readme = generateClientSummary(summary, order, latestCodes, project, scanLogs);
   const readmePath = path.join(outputDir, '客户验货摘要.txt');
   fs.writeFileSync(readmePath, readme, 'utf-8');
-  printSuccess(`[8/8] 客户验货摘要: ${path.basename(readmePath)}`);
+  printSuccess(`[9/9] 客户验货摘要: ${path.basename(readmePath)}`);
 
   console.log();
   printSection('验货包汇总');
@@ -201,6 +219,7 @@ function exportInspectionPackage(storage, opts) {
       ['已包装箱数', boxes.length],
       ['已包装件数', summary.packaging.totalQty],
       ['追溯码数', `${latestCodes.length}/${boxes.length}${latestCodes.length < boxes.length ? ' (有缺失!)' : ''}`],
+      ['扫码查询次数', `${scanLogs.length} 次 (${summary.scanLogs.uniqueCodesScanned}个码被查过)`],
       ['输出目录', outputDir]
     ]
   );
@@ -420,10 +439,11 @@ function generateReworkAnalysisCSV(summary, inspections, order) {
   return csv;
 }
 
-function generateClientSummary(s, order, codes, project) {
+function generateClientSummary(s, order, codes, project, scanLogs) {
   const j = s.inspection.finalJudgment;
   const jCn = { PASS: '放行合格', REWORK: '需返工处理', REJECT: '不合格退货', PENDING: '待检验' }[j] || j;
   const jEmoji = { PASS: '✅', REWORK: '⚠️', REJECT: '❌', PENDING: '⏳' }[j] || '';
+  scanLogs = scanLogs || [];
 
   let text = '';
   text += '╔' + '═'.repeat(62) + '╗\n';
@@ -488,7 +508,21 @@ function generateClientSummary(s, order, codes, project) {
   text += `  5. batch-tracechain-${order.orderNo}.csv     批次追溯链 (面辅料→裁剪→箱唛)\n`;
   text += `  6. rework-analysis-${order.orderNo}.csv      返工率分析与质量评估\n`;
   text += `  7. trace-codes-${order.orderNo}.tsv          追溯码清单 (贴箱用)\n`;
-  text += `  8. 客户验货摘要.txt                            本摘要文件\n\n`;
+  text += `  8. scan-logs-${order.orderNo}.tsv            扫码记录清单 (按时间倒序)\n`;
+  text += `  9. 客户验货摘要.txt                            本摘要文件\n\n`;
+
+  if (scanLogs.length > 0) {
+    const lastScan = scanLogs.slice().sort((a, b) => new Date(b.scannedAt) - new Date(a.scannedAt))[0];
+    const uniqueCodes = [...new Set(scanLogs.map(l => l.traceCode))].length;
+    text += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+    text += '  补充：扫码查询统计\n';
+    text += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+    text += `  累计扫码次数:    ${scanLogs.length} 次\n`;
+    text += `  已被查询的码:    ${uniqueCodes} 个箱子\n`;
+    text += `  最近一次扫码:    ${lastScan ? formatDateTime(lastScan.scannedAt) : '-'}\n`;
+    if (lastScan?.note) text += `  最近扫码备注:    ${lastScan.note}\n`;
+    text += '\n';
+  }
 
   text += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
   text += '  五、追溯说明\n';
@@ -858,7 +892,7 @@ function printHelp() {
   --output <目录>           输出目录 (默认: 项目根目录下)
   --generateCodes           如无追溯码则自动生成并绑定
 
-  👉 生成的资料包内包含 8 个文件:
+  👉 生成的资料包内包含 9 个文件:
      1. inspection-report-*.json  完整数据 (系统对接用)
      2. inspection-report-*.csv   检验报告 (Excel打开)
      3. packing-list-*.csv        装箱单 (每箱明细)
@@ -866,7 +900,8 @@ function printHelp() {
      5. batch-tracechain-*.csv    批次追溯链(面辅料→裁剪→箱唛)
      6. rework-analysis-*.csv     返工率分析与质量等级
      7. trace-codes-*.tsv         追溯码清单 (贴箱用)
-     8. 客户验货摘要.txt          给客户看的专业文字摘要
+     8. scan-logs-*.tsv           扫码记录清单 (按时间倒序)
+     9. 客户验货摘要.txt          给客户看的专业文字摘要
 
 🏷 追溯码管理:
   --traceCodes              生成/导出追溯码列表

@@ -1,6 +1,6 @@
 [
   {
-    "id": "CUT-MQ5J8PAJ1MANH7",
+    "id": "CUT-MQ5JYY3BB7RK8C",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "bedNo": "1",
@@ -20,10 +20,10 @@
     "markerWidth": 1.85,
     "fabricUsage": 1480.5,
     "remark": "",
-    "recordedAt": "2026-06-08T18:16:40.460Z"
+    "recordedAt": "2026-06-08T18:37:04.920Z"
   },
   {
-    "id": "CUT-MQ5J8PDC37H1FB",
+    "id": "CUT-MQ5JYY64OHTLI0",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "bedNo": "2",
@@ -44,6 +44,6 @@
     "markerWidth": 0,
     "fabricUsage": 2220.3,
     "remark": "",
-    "recordedAt": "2026-06-08T18:16:40.560Z"
+    "recordedAt": "2026-06-08T18:37:05.020Z"
   }
 ]

@@ -13,7 +13,8 @@ class Storage {
       sewing: path.join(this.dataDir, 'sewing.json'),
       inspections: path.join(this.dataDir, 'inspections.json'),
       boxes: path.join(this.dataDir, 'boxes.json'),
-      traceCodes: path.join(this.dataDir, 'trace-codes.json')
+      traceCodes: path.join(this.dataDir, 'trace-codes.json'),
+      scanLogs: path.join(this.dataDir, 'scan-logs.json')
     };
   }
 
@@ -200,6 +201,32 @@ class Storage {
 
   findTraceCodesByOrder(orderNo) {
     return this.getTraceCodes().filter(c => c.orderNo === orderNo);
+  }
+
+  getScanLogs() {
+    return this.readFile(this.files.scanLogs, []);
+  }
+
+  saveScanLogs(logs) {
+    this.writeFile(this.files.scanLogs, logs);
+  }
+
+  addScanLog(log) {
+    const logs = this.getScanLogs();
+    logs.push(log);
+    this.saveScanLogs(logs);
+  }
+
+  findScanLogsByTraceCode(code) {
+    return this.getScanLogs().filter(l => l.traceCode === code);
+  }
+
+  findScanLogsByOrder(orderNo) {
+    return this.getScanLogs().filter(l => l.orderNo === orderNo);
+  }
+
+  findScanLogsByBox(boxNo) {
+    return this.getScanLogs().filter(l => l.boxNo === boxNo);
   }
 }
 

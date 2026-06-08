@@ -1,6 +1,6 @@
 [
   {
-    "id": "BOX-MQ5J8Q8EU9M4TL",
+    "id": "BOX-MQ5JYZ17JZ7QUP",
     "boxNo": "JXA001-6001-0001",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
@@ -25,7 +25,7 @@
     "remark": ""
   },
   {
-    "id": "BOX-MQ5J8QB2BH9KGC",
+    "id": "BOX-MQ5JYZ3RKPI1JX",
     "boxNo": "JXA001-6001-0002",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
@@ -45,12 +45,12 @@
     "sealNo": "SL000002",
     "palletNo": "",
     "packedBy": "",
-    "packDate": "2026-06-08T18:16:41.774Z",
+    "packDate": "2026-06-08T18:37:06.231Z",
     "status": "PACKED",
     "remark": ""
   },
   {
-    "id": "BOX-MQ5J8QDN4SKBDM",
+    "id": "BOX-MQ5JYZ6EM2NJM4",
     "boxNo": "JXA001-6001-0003",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
@@ -70,7 +70,7 @@
     "sealNo": "SL000003",
     "palletNo": "",
     "packedBy": "",
-    "packDate": "2026-06-08T18:16:41.867Z",
+    "packDate": "2026-06-08T18:37:06.326Z",
     "status": "PACKED",
     "remark": ""
   }

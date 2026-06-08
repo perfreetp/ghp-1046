@@ -1,4 +1,4 @@
-const { formatDate, formatDateTime, printTable, printError, printWarning, printInfo, printHeader, printSection, calculateReorderRate } = require('../utils');
+const { formatDate, formatDateTime, printTable, printSuccess, printError, printWarning, printInfo, printHeader, printSection, calculateReorderRate } = require('../utils');
 
 function queryCommand(args, storage) {
   if (!storage.isInitialized()) {
@@ -14,8 +14,12 @@ function queryCommand(args, storage) {
   const opts = parseArgs(args);
 
   // ═══════════════════════════════════════
-  // 路由逻辑：带筛选条件的统计类命令优先
+  // 路由逻辑：统计/看板类命令最优先
   // ═══════════════════════════════════════
+  if (opts.alert) {
+    return showQualityAlert(storage, opts);
+  }
+
   if (opts.reworkRate) {
     return showReworkRate(storage, opts);
   }
@@ -32,7 +36,7 @@ function queryCommand(args, storage) {
   // 路由逻辑：精确查询类命令
   // ═══════════════════════════════════════
   if (opts.traceCode) {
-    return queryByTraceCode(storage, opts.traceCode);
+    return queryByTraceCode(storage, opts.traceCode, opts.scanNote);
   }
 
   if (opts.boxNo) {
@@ -48,7 +52,7 @@ function queryCommand(args, storage) {
   }
 
   // ═══════════════════════════════════════
-  // 路由逻辑：聚合类查询（可能同时带style/order）
+  // 路由逻辑：聚合类查询
   // ═══════════════════════════════════════
   if (opts.orderNo && !opts.styleNo) {
     return queryByOrder(storage, opts.orderNo, opts.withDetails);
@@ -62,8 +66,212 @@ function queryCommand(args, storage) {
     return queryByOrder(storage, opts.orderNo, opts.withDetails);
   }
 
-  // 默认：项目总览
   return showSummary(storage);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 质量预警看板 (新增)
+// ═══════════════════════════════════════════════════════════════
+function showQualityAlert(storage, opts = {}) {
+  const days = parseInt(opts.days || '7', 10);
+  const now = Date.now();
+  const daysAgo = new Date(now - days * 86400000);
+  daysAgo.setHours(0, 0, 0, 0);
+  const daysAgoTs = daysAgo.getTime();
+
+  printHeader(`质量预警看板 (最近 ${days} 天 · ${formatDate(daysAgo)} ~ 今日)`);
+
+  const allInsp = storage.getInspections();
+  const recentInsp = allInsp.filter(i => new Date(i.inspectDate).getTime() >= daysAgoTs);
+  const orders = storage.getOrders();
+
+  if (recentInsp.length === 0) {
+    printWarning(`最近 ${days} 天暂无质检记录`);
+    return 0;
+  }
+
+  // ── 指标：对比前一段（环比） ──
+  const prevEndTs = daysAgoTs - 1;
+  const prevStartTs = daysAgoTs - days * 86400000;
+  const prevInsp = allInsp.filter(i => {
+    const t = new Date(i.inspectDate).getTime();
+    return t >= prevStartTs && t <= prevEndTs;
+  });
+
+  const curStats = calculateReorderRate(recentInsp);
+  const prevStats = calculateReorderRate(prevInsp);
+  const rateDelta = (curStats.rate - prevStats.rate).toFixed(2);
+  const deltaColor = parseFloat(rateDelta) >= 1 ? '\x1b[31m' : parseFloat(rateDelta) > 0 ? '\x1b[33m' : '\x1b[32m';
+  const deltaSign = parseFloat(rateDelta) > 0 ? '+' : '';
+
+  printSection(`总体趋势 (对比前${days}天)`);
+  printTable(
+    ['指标', `最近${days}天`, `前${days}天`, '变化'],
+    [
+      ['质检次数', recentInsp.length, prevInsp.length, (recentInsp.length - prevInsp.length) >= 0 ? '+' + (recentInsp.length - prevInsp.length) : (recentInsp.length - prevInsp.length)],
+      ['抽检总数', curStats.total, prevStats.total, ''],
+      ['返工总数', curStats.rework, prevStats.rework, (curStats.rework - prevStats.rework) >= 0 ? '+' + (curStats.rework - prevStats.rework) : (curStats.rework - prevStats.rework)],
+      ['返工率', `${curStats.rate}%`, `${prevStats.rate}%`, `${deltaColor}${deltaSign}${rateDelta}%\x1b[0m`]
+    ]
+  );
+
+  // ── 按订单维度统计：返工率、退货数、疵点爆发 ──
+  const orderMap = {};
+  recentInsp.forEach(i => {
+    if (!orderMap[i.orderNo]) {
+      const o = storage.findOrder(i.orderNo) || {};
+      orderMap[i.orderNo] = {
+        orderNo: i.orderNo,
+        styleNo: i.styleNo || o.styleNo || '',
+        customer: o.customer || '',
+        inspCount: 0,
+        totalInsp: 0,
+        reworkQty: 0,
+        rejectQty: 0,
+        defects: {},
+        firstInsp: i.inspectDate,
+        lastInsp: i.inspectDate
+      };
+    }
+    const s = orderMap[i.orderNo];
+    s.inspCount++;
+    s.totalInsp += i.inspectedQty;
+    s.reworkQty += i.reworkQty;
+    s.rejectQty += i.rejectQty;
+    Object.entries(i.defects || {}).forEach(([d, n]) => { s.defects[d] = (s.defects[d] || 0) + n; });
+    if (new Date(i.inspectDate) < new Date(s.firstInsp)) s.firstInsp = i.inspectDate;
+    if (new Date(i.inspectDate) > new Date(s.lastInsp)) s.lastInsp = i.inspectDate;
+  });
+
+  // ── 计算每条风险评分 ──
+  const alerts = [];
+  Object.values(orderMap).forEach(s => {
+    const reworkRate = s.totalInsp > 0 ? (s.reworkQty / s.totalInsp) * 100 : 0;
+    s.reworkRate = reworkRate;
+    s.rejectRate = s.totalInsp > 0 ? (s.rejectQty / s.totalInsp) * 100 : 0;
+    s.topDefect = Object.entries(s.defects).sort((a, b) => b[1] - a[1])[0];
+
+    // 环比返工率对比
+    const prevOrderInsp = prevInsp.filter(i => i.orderNo === s.orderNo);
+    const prev = calculateReorderRate(prevOrderInsp);
+    s.rateDelta = reworkRate - prev.rate;
+
+    const reasons = [];
+    let score = 0;
+
+    if (reworkRate >= 5) { reasons.push('🔴 返工率≥5% 严重'); score += 100; }
+    else if (reworkRate >= 3) { reasons.push('🟠 返工率≥3% 偏高'); score += 50; }
+    else if (reworkRate >= 1) { reasons.push('🟡 返工率≥1% 观察'); score += 20; }
+
+    if (s.rateDelta >= 3) { reasons.push(`📈 返工率环比上升 ${s.rateDelta.toFixed(1)}%`); score += 60; }
+    else if (s.rateDelta >= 1) { reasons.push(`📈 返工率环比上升 ${s.rateDelta.toFixed(1)}%`); score += 30; }
+
+    if (s.rejectQty >= 10) { reasons.push(`🔴 退货数偏高(${s.rejectQty}件)`); score += 80; }
+    else if (s.rejectQty >= 5) { reasons.push(`🟠 退货数较多(${s.rejectQty}件)`); score += 40; }
+    else if (s.rejectQty >= 1) { reasons.push(`🟡 有退货记录(${s.rejectQty}件)`); score += 10; }
+
+    if (s.topDefect && s.topDefect[1] >= 10) { reasons.push(`🔥 [${s.topDefect[0]}] 疵点爆发(${s.topDefect[1]}个)`); score += 70; }
+    else if (s.topDefect && s.topDefect[1] >= 5) { reasons.push(`⚠️ [${s.topDefect[0]}] 疵点较多(${s.topDefect[1]}个)`); score += 30; }
+
+    s.reasons = reasons;
+    s.score = score;
+
+    if (score > 0) alerts.push(s);
+  });
+
+  alerts.sort((a, b) => b.score - a.score);
+
+  if (alerts.length === 0) {
+    console.log();
+    printSuccess(`✅ 最近 ${days} 天暂无高风险订单，品质表现稳定！`);
+    return 0;
+  }
+
+  printSection(`需要关注的订单 (共 ${alerts.length} 个，按风险优先级排序)`);
+
+  alerts.forEach((s, idx) => {
+    const badge = s.score >= 100 ? '\x1b[31m🔴 紧急\x1b[0m'
+      : s.score >= 60 ? '\x1b[33m🟠 高\x1b[0m'
+        : s.score >= 30 ? '\x1b[33m🟡 中\x1b[0m'
+          : '\x1b[36m🔵 低\x1b[0m';
+    console.log();
+    console.log(`${String(idx + 1).padStart(2, ' ')}. ${badge}  [风险分 ${s.score}]  订单 ${s.orderNo}  款号 ${s.styleNo || '-'}  客户 ${s.customer || '-'}`);
+    console.log(`      返工率: ${s.reworkRate.toFixed(2)}%  |  返工: ${s.reworkQty}件  |  退货: ${s.rejectQty}件  |  质检: ${s.inspCount}次 / ${s.totalInsp}件`);
+    if (s.rateDelta !== 0) {
+      const arrow = s.rateDelta > 0 ? '↑' : '↓';
+      const color = s.rateDelta > 0 ? '\x1b[31m' : '\x1b[32m';
+      console.log(`      环比变化: ${color}${arrow} ${Math.abs(s.rateDelta).toFixed(1)}%\x1b[0m  (前${days}天 ${(s.reworkRate - s.rateDelta).toFixed(2)}%)`);
+    }
+    console.log(`      质检日期: ${formatDate(s.firstInsp)} ~ ${formatDate(s.lastInsp)}`);
+    console.log(`      风险原因: ${s.reasons.join('  ')}`);
+    if (s.topDefect) console.log(`      最高发疵点: ${s.topDefect[0]} × ${s.topDefect[1]}  → 建议: ${getDefectSuggestion(s.topDefect[0])}`);
+    console.log(`      ➜ 查看详情: gt query --orderNo ${s.orderNo}`);
+    console.log(`      ➜ 返工率分析: gt query --reworkRate --orderNo ${s.orderNo}`);
+  });
+
+  // ── 全维度疵点爆发汇总 ──
+  const allDefects = {};
+  recentInsp.forEach(i => {
+    Object.entries(i.defects || {}).forEach(([d, n]) => {
+      if (!allDefects[d]) allDefects[d] = { cur: 0, prev: 0 };
+      allDefects[d].cur += n;
+    });
+  });
+  prevInsp.forEach(i => {
+    Object.entries(i.defects || {}).forEach(([d, n]) => {
+      if (!allDefects[d]) allDefects[d] = { cur: 0, prev: 0 };
+      allDefects[d].prev += n;
+    });
+  });
+  const defectAlerts = Object.entries(allDefects)
+    .map(([d, v]) => ({ name: d, cur: v.cur, prev: v.prev, delta: v.cur - v.prev, deltaPct: v.prev > 0 ? ((v.cur - v.prev) / v.prev * 100) : v.cur > 0 ? 999 : 0 }))
+    .filter(v => v.cur >= 3 && (v.delta >= 2 || v.deltaPct >= 50))
+    .sort((a, b) => b.cur - a.cur);
+
+  if (defectAlerts.length > 0) {
+    console.log();
+    printSection(`疵点异常波动 (最近${days}天 vs 前${days}天, 共${defectAlerts.length}类)`);
+    printTable(
+      ['疵点类型', `最近${days}天`, `前${days}天`, '增长数', '增幅'],
+      defectAlerts.map(d => [
+        d.name, d.cur, d.prev,
+        d.delta > 0 ? '+' + d.delta : d.delta,
+        d.deltaPct >= 999 ? '新增爆发' : (d.deltaPct > 0 ? '+' + d.deltaPct.toFixed(0) + '%' : d.deltaPct.toFixed(0) + '%')
+      ])
+    );
+    defectAlerts.forEach(d => {
+      console.log(`  💡 [${d.name}] ${getDefectSuggestion(d.name)}`);
+    });
+  }
+
+  // ── 客户维度TOP3 ──
+  const custMap = {};
+  recentInsp.forEach(i => {
+    const o = storage.findOrder(i.orderNo) || {};
+    const c = o.customer || '(未填)';
+    if (!custMap[c]) custMap[c] = { total: 0, rework: 0, reject: 0, orders: new Set() };
+    custMap[c].total += i.inspectedQty;
+    custMap[c].rework += i.reworkQty;
+    custMap[c].reject += i.rejectQty;
+    custMap[c].orders.add(i.orderNo);
+  });
+  const custRank = Object.entries(custMap)
+    .map(([c, v]) => [c, v.orders.size, v.total, v.rework, v.reject, v.total > 0 ? ((v.rework / v.total) * 100).toFixed(2) + '%' : '0.00%'])
+    .sort((a, b) => parseFloat(b[5]) - parseFloat(a[5]))
+    .slice(0, 5);
+
+  if (custRank.length > 1) {
+    console.log();
+    printSection('按客户维度返工率排名 (Top 5)');
+    printTable(['客户', '订单数', '抽检数', '返工数', '退货数', '返工率'], custRank);
+  }
+
+  console.log();
+  printInfo('快捷操作:');
+  console.log(`  ➜ 调整窗口: gt query --alert --days 30`);
+  console.log(`  ➜ 整体返工率: gt query --reworkRate --fromDate ${formatDate(daysAgo)}`);
+
+  return 0;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -72,18 +280,15 @@ function queryCommand(args, storage) {
 function queryByBatch(storage, batchNo) {
   printHeader(`批次完整追踪: ${batchNo}`);
 
-  // 1) 在面辅料里找：面料缸号(lotNo) 或 辅料批次(batchNo)
   const matchedMaterials = storage.getMaterials().filter(m =>
     (m.lotNo && m.lotNo.toLowerCase().includes(batchNo.toLowerCase())) ||
     (m.batchNo && m.batchNo.toLowerCase().includes(batchNo.toLowerCase()))
   );
 
-  // 2) 在质检里找：质检批次号
   const matchedInspections = storage.getInspections().filter(i =>
     i.batchNo && i.batchNo.toLowerCase().includes(batchNo.toLowerCase())
   );
 
-  // 3) 汇总关联订单号
   const orderNos = new Set();
   matchedMaterials.forEach(m => orderNos.add(m.orderNo));
   matchedInspections.forEach(i => orderNos.add(i.orderNo));
@@ -107,7 +312,6 @@ function queryByBatch(storage, batchNo) {
   sourceRows.push(['关联订单', `${orderNos.size}个: ${[...orderNos].join(', ')}`]);
   printTable(['匹配来源', '详情'], sourceRows);
 
-  // ════════ 关联订单 ════════
   printSection(`关联订单 & 款号 (共${orderNos.size}个)`);
   const orders = [...orderNos].map(on => storage.findOrder(on)).filter(Boolean);
   printTable(
@@ -119,123 +323,114 @@ function queryByBatch(storage, batchNo) {
     ])
   );
 
-  // ════════ 面辅料明细 ════════
   if (matchedMaterials.length > 0) {
-    printSection('匹配的面辅料明细');
+    printSection(`匹配的面辅料明细 (共${matchedMaterials.length}条)`);
     printTable(
       ['订单号', '类型', '分类', '名称', '面料缸号', '辅料批次', '颜色', '数量', '单位', '供应商'],
       matchedMaterials.map(m => [
-        m.orderNo, m.type, m.category, m.name,
-        m.lotNo || '-', m.batchNo || '-', m.color,
-        m.qty, m.unit, m.supplier
+        m.orderNo, m.type, m.category || '-', m.name,
+        m.lotNo || '-', m.batchNo || '-', m.color || '-',
+        m.qty, m.unit || '-', m.supplier || '-'
       ])
     );
   }
 
-  // ════════ 关联裁剪床次 ════════
-  const matchedCuts = storage.getCutting().filter(c =>
-    (c.fabricLot && c.fabricLot.toLowerCase().includes(batchNo.toLowerCase())) ||
-    orderNos.has(c.orderNo)
-  );
-
-  if (matchedCuts.length > 0) {
-    const cutQty = matchedCuts.reduce((s, c) => s + (c.totalQty || 0), 0);
-    printSection(`关联的裁剪床次 (共${matchedCuts.length}床, ${cutQty}件)`);
-    printTable(
-      ['订单号', '床次', '层数', '拉布匹数', '裁剪数', '裁剪员', '裁剪日期', '面料缸号'],
-      matchedCuts.map(c => [
-        c.orderNo, `第${c.bedNo}床`, c.layerCount, c.spreads, c.totalQty,
-        c.cutter || '-', formatDate(c.cutDate), c.fabricLot || '-'
-      ])
-    );
-  }
-
-  // ════════ 关联箱唛 ════════
-  const relatedBoxes = [];
-  for (const orderNo of orderNos) {
-    relatedBoxes.push(...storage.findBoxesByOrder(orderNo));
-  }
-  matchedInspections.forEach(i => {
-    if (i.boxNo) {
-      const b = storage.findBoxByNo(i.boxNo);
-      if (b && !relatedBoxes.find(rb => rb.boxNo === b.boxNo)) relatedBoxes.push(b);
-    }
+  const allCuts = [];
+  const allBoxes = [];
+  orders.forEach(o => {
+    storage.findCuttingByOrder(o.orderNo).forEach(c => allCuts.push(c));
+    storage.findBoxesByOrder(o.orderNo).forEach(b => allBoxes.push(b));
   });
 
-  if (relatedBoxes.length > 0) {
-    const totalQty = relatedBoxes.reduce((s, b) => s + (b.qty || 0), 0);
-    printSection(`关联的出货箱 (共${relatedBoxes.length}箱, ${totalQty}件)`);
+  if (allCuts.length > 0) {
+    const linkedFabricLots = new Set(matchedMaterials.filter(m => m.type === '面料').map(m => m.lotNo).filter(Boolean));
+    const matchedCuts = allCuts.filter(c => !c.fabricLot || linkedFabricLots.has(c.fabricLot) || matchedMaterials.length === 0 ? true : linkedFabricLots.has(c.fabricLot));
+    const displayCuts = matchedMaterials.some(m => m.type === '面料' && m.lotNo) ? matchedCuts : allCuts;
+    const totalCut = displayCuts.reduce((s, c) => s + (c.totalQty || 0), 0);
+    printSection(`关联的裁剪床次 (共${displayCuts.length}床, ${totalCut}件)`);
+    printTable(
+      ['订单号', '床次', '层数', '拉布匹数', '裁剪数', '裁剪员', '裁剪日期', '面料缸号'],
+      displayCuts.map(c => [
+        c.orderNo, c.bedNo, c.layers || '-', c.spreads || '-',
+        c.totalQty, c.cutter || '-', formatDate(c.cutDate), c.fabricLot || '-'
+      ])
+    );
+  }
+
+  if (allBoxes.length > 0) {
+    const totalQty = allBoxes.reduce((s, b) => s + (b.qty || 0), 0);
+    printSection(`关联的出货箱 (共${allBoxes.length}箱, ${totalQty}件)`);
     printTable(
       ['箱唛编号', '订单号', '款号', '颜色', '件数', '毛重(kg)', '净重(kg)', '包装日期'],
-      relatedBoxes.map(b => [
-        b.boxNo, b.orderNo, b.styleNo, b.color, b.qty,
-        b.grossWeight || '-', b.netWeight || '-', formatDate(b.packDate)
+      allBoxes.map(b => [
+        b.boxNo, b.orderNo, b.styleNo, b.color || '-',
+        b.qty, b.grossWeight || '-', b.netWeight || '-', formatDate(b.packDate)
       ])
     );
     console.log();
     printInfo('按箱号查看完整追溯链:');
-    relatedBoxes.slice(0, 5).forEach(b => {
-      console.log(`  ➜ gt query --boxNo ${b.boxNo}`);
-    });
-    if (relatedBoxes.length > 5) {
-      console.log(`  ... (还有 ${relatedBoxes.length - 5} 箱)`);
-    }
+    allBoxes.forEach(b => console.log(`  ➜ gt query --boxNo ${b.boxNo}`));
   }
 
-  // ════════ 关联质检 ════════
-  if (matchedInspections.length > 0) {
-    const inspStats = calculateReorderRate(matchedInspections);
-    printSection(`关联的质检记录 (${matchedInspections.length}次, 返工率${inspStats.rate}%)`);
+  const allInsp = [];
+  orders.forEach(o => storage.findInspectionsByOrder(o.orderNo).forEach(i => allInsp.push(i)));
+  if (allInsp.length > 0) {
+    const totalInsp = allInsp.reduce((s, i) => s + i.inspectedQty, 0);
+    const totalRework = allInsp.reduce((s, i) => s + i.reworkQty, 0);
+    const rr = totalInsp > 0 ? ((totalRework / totalInsp) * 100).toFixed(2) : '0.00';
+    printSection(`关联质检记录 (共${allInsp.length}次, 返工率${rr}%)`);
     printTable(
-      ['订单号', '箱号', '检验员', '日期', '抽检', '合格', '返工', '退货', '判定'],
-      matchedInspections.map(i => [
-        i.orderNo, i.boxNo || i.batchNo || '-', i.inspector || '-',
-        formatDate(i.inspectDate), i.inspectedQty, i.passQty,
-        i.reworkQty, i.rejectQty, renderJudgment(i.judgment)
+      ['订单号', '箱号/批次', '检验员', '日期', '抽检', '合格', '返工', '退货', '判定'],
+      allInsp.map(i => [
+        i.orderNo, i.boxNo || i.batchNo || '-', i.inspector || '-', formatDate(i.inspectDate),
+        i.inspectedQty, i.passQty, i.reworkQty, i.rejectQty, renderJudgment(i.judgment)
       ])
     );
   }
 
   console.log();
-  printInfo('进一步查询：');
-  orders.slice(0, 3).forEach(o => {
-    console.log(`  ➜ 订单追溯: gt query --orderNo ${o.orderNo}`);
-  });
+  orders.forEach(o => printInfo(`➜ 订单追溯: gt query --orderNo ${o.orderNo}`));
 
   return 0;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// 新：面料缸号/辅料批次专用查询入口 (支持直接指定 --lotNo 或 --materialBatch)
-// ═══════════════════════════════════════════════════════════════
 function queryByMaterialBatch(storage, opts) {
-  const searchTerm = opts.lotNo || opts.materialBatch;
-  const typeLabel = opts.lotNo ? '面料缸号' : '辅料批次';
-  printHeader(`${typeLabel}追踪: ${searchTerm}`);
-  printInfo(`注意: 也可以直接使用 gt query --batchNo "${searchTerm}" 查询`);
-  console.log();
-  return queryByBatch(storage, searchTerm);
+  const key = opts.lotNo
+    ? `面料缸号 ${opts.lotNo}`
+    : `辅料批次 ${opts.materialBatch}`;
+  const batch = opts.lotNo || opts.materialBatch;
+  printSection(`精确查询入口: ${key}`);
+  return queryByBatch(storage, batch);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 返工率分析：支持按客户/款号/订单/时间范围筛选
+// 返工率分析（含日期闭区间 + 命中范围显示）
 // ═══════════════════════════════════════════════════════════════
 function showReworkRate(storage, opts = {}) {
   printHeader('返工率统计分析');
 
-  // ── 显示当前应用的筛选条件 ──
   const filters = [];
   if (opts.customer) filters.push(`客户="${opts.customer}"`);
   if (opts.styleNo) filters.push(`款号包含"${opts.styleNo}"`);
   if (opts.orderNo) filters.push(`订单号="${opts.orderNo}"`);
-  if (opts.fromDate) filters.push(`日期≥${opts.fromDate}`);
-  if (opts.toDate) filters.push(`日期≤${opts.toDate}`);
+  let fromTs = null, toTs = null;
+  if (opts.fromDate) {
+    const d = new Date(opts.fromDate);
+    d.setHours(0, 0, 0, 0);
+    fromTs = d.getTime();
+    filters.push(`日期≥${opts.fromDate} (含全天)`);
+  }
+  if (opts.toDate) {
+    const d = new Date(opts.toDate);
+    d.setHours(23, 59, 59, 999);
+    toTs = d.getTime();
+    filters.push(`日期≤${opts.toDate} (含全天)`);
+  }
   if (filters.length > 0) {
     printInfo(`当前筛选: ${filters.join('  AND  ')}`);
     console.log();
   }
 
-  // ── 取得订单级匹配，先筛订单 ──
   let matchedOrders = storage.getOrders();
   if (opts.customer) {
     matchedOrders = matchedOrders.filter(o =>
@@ -252,15 +447,12 @@ function showReworkRate(storage, opts = {}) {
   }
   const matchedOrderNos = new Set(matchedOrders.map(o => o.orderNo));
 
-  // ── 按质检日期 + 订单过滤 ──
   let inspections = storage.getInspections().filter(i => matchedOrderNos.has(i.orderNo));
-  if (opts.fromDate) {
-    const from = new Date(opts.fromDate).getTime();
-    inspections = inspections.filter(i => new Date(i.inspectDate).getTime() >= from);
+  if (fromTs !== null) {
+    inspections = inspections.filter(i => new Date(i.inspectDate).getTime() >= fromTs);
   }
-  if (opts.toDate) {
-    const to = new Date(opts.toDate).getTime();
-    inspections = inspections.filter(i => new Date(i.inspectDate).getTime() <= to);
+  if (toTs !== null) {
+    inspections = inspections.filter(i => new Date(i.inspectDate).getTime() <= toTs);
   }
 
   if (inspections.length === 0) {
@@ -271,7 +463,21 @@ function showReworkRate(storage, opts = {}) {
     return 0;
   }
 
-  // ── 总体指标 ──
+  // 实际命中的日期范围
+  const tsArr = inspections.map(i => new Date(i.inspectDate).getTime());
+  const earliest = new Date(Math.min(...tsArr));
+  const latest = new Date(Math.max(...tsArr));
+  printSection('时间范围确认');
+  printTable(
+    ['项目', '日期时间'],
+    [
+      ['筛选条件区间', `${opts.fromDate || '不限'}  ~  ${opts.toDate || '不限'}`],
+      ['实际最早质检', formatDateTime(earliest)],
+      ['实际最晚质检', formatDateTime(latest)],
+      ['命中记录数', inspections.length + ' 次']
+    ]
+  );
+
   const overall = calculateReorderRate(inspections);
   printSection('总体指标');
   const matchOrderCount = new Set(inspections.map(i => i.orderNo)).size;
@@ -286,7 +492,6 @@ function showReworkRate(storage, opts = {}) {
     ]
   );
 
-  // ── 按订单维度排序 ──
   const orderStats = {};
   inspections.forEach(i => {
     if (!orderStats[i.orderNo]) {
@@ -311,7 +516,6 @@ function showReworkRate(storage, opts = {}) {
     const rate = s.totalInsp > 0 ? ((s.reworkQty / s.totalInsp) * 100).toFixed(2) : '0.00';
     return [orderNo, s.style, s.customer, s.count, s.totalInsp, s.reworkQty, s.rejectQty, `${rate}%`];
   }).sort((a, b) => {
-    // 综合排序：返工率降序 + 返工数降序
     const ra = parseFloat(a[7]);
     const rb = parseFloat(b[7]);
     if (rb !== ra) return rb - ra;
@@ -324,22 +528,20 @@ function showReworkRate(storage, opts = {}) {
     orderRows.slice(0, 10)
   );
 
-  // ── 重点关注订单 ──
   const highRisk = orderRows.filter(r => parseFloat(r[7]) >= 3 || r[5] >= 20);
   if (highRisk.length > 0) {
     printSection(`⚠ 重点关注订单 (返工率≥3% 或 返工数≥20, 共${highRisk.length}个)`);
     highRisk.forEach((r, idx) => {
       const advice = parseFloat(r[7]) >= 5
-        ? '严重：立即停线排查'
+        ? '🔴 严重：立即停线排查'
         : parseFloat(r[7]) >= 3
-          ? '警告：加强抽检'
-          : '观察：关注返工趋势';
+          ? '🟠 警告：加强抽检'
+          : '🟡 观察：关注返工趋势';
       console.log(`  ${idx + 1}. [${advice}] 订单 ${r[0]} (款号 ${r[1]})  返工率 ${r[7]}  返工 ${r[5]}件 / 退货 ${r[6]}件`);
       console.log(`     ➜ 查看详情: gt query --orderNo ${r[0]}`);
     });
   }
 
-  // ── 按客户维度 ──
   printSection('按客户维度汇总');
   const customerStats = {};
   inspections.forEach(i => {
@@ -359,7 +561,6 @@ function showReworkRate(storage, opts = {}) {
     .sort((a, b) => parseFloat(b[5]) - parseFloat(a[5]));
   printTable(['客户', '订单数', '质检次数', '抽检数', '返工数', '返工率'], customerRows);
 
-  // ── 疵点 TOP ──
   const defectSummary = {};
   inspections.forEach(i => {
     Object.entries(i.defects || {}).forEach(([d, n]) => {
@@ -379,13 +580,11 @@ function showReworkRate(storage, opts = {}) {
       });
     printTable(['排名', '疵点类型', '数量', '占比', '分布图'], defectRows);
 
-    // 最严重的疵点给出建议
     const topDefect = Object.entries(defectSummary).sort((a, b) => b[1] - a[1])[0];
     if (topDefect) {
       console.log();
       printInfo(`最多发疵点是「${topDefect[0]}」(${topDefect[1]}个)，建议：`);
-      const suggestion = getDefectSuggestion(topDefect[0]);
-      console.log(`  ${suggestion}`);
+      console.log(`  ${getDefectSuggestion(topDefect[0])}`);
     }
   }
 
@@ -415,7 +614,7 @@ function getDefectSuggestion(defect) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 其他查询函数（保持兼容，略作增强）
+// 聚合查询类
 // ═══════════════════════════════════════════════════════════════
 function queryByStyle(storage, styleNo) {
   const orders = storage.getOrders().filter(o => o.styleNo.toLowerCase().includes(styleNo.toLowerCase()));
@@ -423,181 +622,202 @@ function queryByStyle(storage, styleNo) {
     printWarning(`未找到款号包含 "${styleNo}" 的订单`);
     return 1;
   }
-
-  printHeader(`款号追溯查询: ${styleNo}`);
-  printInfo(`找到 ${orders.length} 个关联订单`);
-
-  for (const order of orders) {
-    printSection(`订单 ${order.orderNo}`);
-    queryByOrder(storage, order.orderNo, false);
-  }
-
-  const allInspections = [];
-  orders.forEach(o => allInspections.push(...storage.findInspectionsByOrder(o.orderNo)));
-  const rate = calculateReorderRate(allInspections);
-
-  printSection('综合统计');
-  printTable(
-    ['指标', '数值'],
-    [
-      ['关联订单数', orders.length],
-      ['订单总数量', orders.reduce((s, o) => s + o.qty, 0)],
-      ['累计抽检数', rate.total],
-      ['累计返工数', rate.rework],
-      ['综合返工率', `${rate.rate}%`],
-      ['客户数', new Set(orders.map(o => o.customer).filter(Boolean)).size]
-    ]
-  );
-
-  printInfo('更详细质量分析: gt query --reworkRate --styleNo ' + styleNo);
-
+  printHeader(`款号聚合追溯: ${styleNo} (共匹配 ${orders.length} 个订单)`);
+  orders.forEach(o => {
+    const insp = storage.findInspectionsByOrder(o.orderNo);
+    const stats = calculateReorderRate(insp);
+    const cuts = storage.findCuttingByOrder(o.orderNo);
+    const boxes = storage.findBoxesByOrder(o.orderNo);
+    printSection(`[${o.orderNo}] ${o.styleName || ''}  客户: ${o.customer}  数量: ${o.qty}`);
+    printTable(
+      ['项目', '数值'],
+      [
+        ['交期', o.deliveryDate ? formatDate(o.deliveryDate) : '-'],
+        ['裁剪床次', `${cuts.length}床 / ${cuts.reduce((s, c) => s + (c.totalQty || 0), 0)}件`],
+        ['出货箱数', `${boxes.length}箱 / ${boxes.reduce((s, b) => s + (b.qty || 0), 0)}件`],
+        ['质检次数', `${insp.length}次 / ${stats.total}件`],
+        ['返工率', `${stats.rate}%`],
+        ['订单状态', renderStatus(o.status)]
+      ]
+    );
+    printInfo(`  ➜ 详细追溯: gt query --orderNo ${o.orderNo}`);
+  });
   return 0;
 }
 
 function queryByOrder(storage, orderNo, withDetails) {
   const order = storage.findOrder(orderNo);
   if (!order) {
-    printWarning(`未找到订单: ${orderNo}`);
+    printError(`订单不存在: ${orderNo}`);
     return 1;
   }
-
-  printHeader(`订单追溯查询: ${orderNo}`);
-
-  printSection('订单基本信息');
+  printHeader(`订单完整追溯: ${orderNo}`);
+  printSection('基本信息');
   printTable(
     ['字段', '值'],
     [
       ['订单号', order.orderNo],
       ['款号', order.styleNo],
-      ['款式名称', order.styleName],
+      ['款式名称', order.styleName || '-'],
       ['客户', order.customer],
-      ['客户PO', order.customerPo],
       ['数量', order.qty],
-      ['单价/金额', `${order.unitPrice.toFixed(2)} / ${order.amount.toFixed(2)}`],
-      ['颜色', order.color],
-      ['尺码范围', order.sizeRange],
+      ['颜色', order.color || '-'],
+      ['单价/金额', order.unitPrice ? `${order.unitPrice}元 / ${order.amount ? order.amount.toFixed(2) + '元' : '-'}` : '-'],
       ['交期', order.deliveryDate ? formatDate(order.deliveryDate) : '-'],
-      ['下单日期', formatDate(order.orderDate)],
-      ['季节', order.season],
-      ['当前状态', renderStatus(order.status)],
-      ['创建时间', formatDateTime(order.createdAt)]
+      ['创建时间', formatDateTime(order.createdAt)],
+      ['状态', renderStatus(order.status)]
     ]
   );
 
-  if (Object.keys(order.sizes || {}).length > 0) {
-    printSection('尺码分配');
-    printTable(
-      ['尺码', '数量'],
-      Object.entries(order.sizes).map(([s, q]) => [s, q])
-    );
-  }
-
   const materials = storage.findMaterialsByOrder(orderNo);
-  if (materials.length > 0) {
-    printSection('面辅料信息');
+  printSection(`面辅料绑定 (${materials.length}条)`);
+  if (materials.length === 0) {
+    printWarning('  未绑定任何面辅料');
+  } else {
     printTable(
-      ['类型', '分类', '名称', '编码', '面料缸号', '辅料批次', '颜色', '数量', '单位', '供应商', '检验'],
+      ['类型', '分类', '名称', '编码', '缸号/批次', '颜色', '数量', '单位', '供应商', 'IQC结果'],
       materials.map(m => [
-        m.type, m.category, m.name, m.code,
-        m.lotNo || '-', m.batchNo || '-', m.color, m.qty, m.unit, m.supplier,
-        renderMaterialResult(m.inspectionResult)
+        m.type, m.category || '-', m.name, m.code || '-',
+        m.lotNo || m.batchNo || '(缺!)', m.color || '-',
+        m.qty, m.unit || '-', m.supplier || '-',
+        renderMaterialResult(m.inspectionResult || 'PENDING')
       ])
     );
-  } else {
-    printWarning('未绑定面辅料信息');
   }
 
   const cuts = storage.findCuttingByOrder(orderNo);
-  if (cuts.length > 0) {
-    const cutTotal = cuts.reduce((s, c) => s + (c.totalQty || 0), 0);
-    printSection(`裁剪记录 (共${cuts.length}床, 合计${cutTotal}件)`);
+  const cutQty = cuts.reduce((s, c) => s + (c.totalQty || 0), 0);
+  printSection(`裁剪床次 (${cuts.length}床, 合计${cutQty}件)`);
+  if (cuts.length === 0) {
+    printWarning('  无裁剪记录');
+  } else {
     printTable(
-      ['床次', '层数', '拉布匹数', '裁剪数', '裁剪员', '日期', '面料缸号'],
+      ['床次', '面料缸号', '层数', '拉布', '件数', '裁剪员', '裁剪日期'],
       cuts.map(c => [
-        `第${c.bedNo}床`, c.layerCount, c.spreads, c.totalQty,
-        c.cutter || '-', formatDate(c.cutDate), c.fabricLot || '-'
+        c.bedNo, c.fabricLot || '-', c.layers || '-', c.spreads || '-',
+        c.totalQty, c.cutter || '-', formatDate(c.cutDate)
       ])
     );
-  } else {
-    printWarning('无裁剪记录');
   }
 
   const sewing = storage.findSewingByOrder(orderNo);
-  if (sewing.length > 0) {
-    printSection(`缝制与包装记录 (共${sewing.length}条)`);
+  const groups = sewing.filter(s => s.process !== '整烫包装');
+  const ironPack = sewing.find(s => s.process === '整烫包装');
+  printSection(`缝制组别 (${groups.length}组)`);
+  if (groups.length === 0) {
+    printWarning('  无缝制组别记录');
+  } else {
+    const sewDone = groups.reduce((s, g) => s + (g.completedQty || 0), 0);
+    const sewAssigned = groups.reduce((s, g) => s + (g.assignedQty || 0), 0);
     printTable(
-      ['工序', '组别/标识', '负责人', '分配/完成', '次品', '开始', '结束'],
-      sewing.map(s => [
-        s.process,
-        s.process === '整烫包装' ? '整烫包装' : `第${s.groupNo}组`,
-        s.leader || s.ironedBy || s.packedBy || '-',
-        `${s.assignedQty || s.ironQty || s.packQty || '-'}/${s.completedQty || s.packQty || '-'}`,
-        s.defectQty || '-',
-        formatDate(s.startDate || s.ironDate || s.packDate),
-        s.endDate ? formatDate(s.endDate) : (s.packDate ? formatDate(s.packDate) : '进行中')
+      ['组别', '组长', '人数', '分配', '完成', '不良数', '开始', '结束'],
+      groups.map(g => [
+        g.groupNo, g.leader || '-', g.members?.length || 0,
+        g.assignedQty || '-', g.completedQty || '-', g.defectQty || 0,
+        formatDate(g.startDate), formatDate(g.endDate)
       ])
     );
+    printInfo(`  累计完成: ${sewDone}/${sewAssigned || order.qty} 件`);
+  }
+
+  if (ironPack) {
+    printSection('整烫包装记录');
+    printTable(
+      ['项目', '内容'],
+      [
+        ['整烫日期/整烫员', `${formatDate(ironPack.ironDate) || '-'} / ${ironPack.ironedBy || '-'}`],
+        ['整烫数量', ironPack.ironQty || '-'],
+        ['包装日期/包装员', `${formatDate(ironPack.packDate) || '-'} / ${ironPack.packedBy || '-'}`],
+        ['包装数量', ironPack.packQty || '-'],
+        ['应装总箱数', ironPack.boxCount || '-']
+      ]
+    );
   } else {
-    printWarning('无缝制/包装记录');
+    printSection('整烫包装记录');
+    printWarning('  无整烫包装记录');
   }
 
   const inspections = storage.findInspectionsByOrder(orderNo);
-  if (inspections.length > 0) {
-    const stats = calculateReorderRate(inspections);
-    printSection(`质检记录 (共${inspections.length}次, 返工率${stats.rate}%)`);
+  const stats = calculateReorderRate(inspections);
+  printSection(`质检抽检 (${inspections.length}次, 返工率${stats.rate}%)`);
+  if (inspections.length === 0) {
+    printWarning('  无质检记录');
+  } else {
     printTable(
-      ['箱号/批次', '检验员', '日期', '抽检', '合格', '返工', '退货', '判定'],
-      inspections.map(i => [
-        i.boxNo || i.batchNo || '-', i.inspector || '-',
-        formatDate(i.inspectDate), i.inspectedQty, i.passQty,
-        i.reworkQty, i.rejectQty, renderJudgment(i.judgment)
+      ['#', '箱号/批次', '检验员', '日期', '抽检', '合格', '返工', '退货', '判定'],
+      inspections.map((i, idx) => [
+        idx + 1, i.boxNo || i.batchNo || '-', i.inspector || '-', formatDate(i.inspectDate),
+        i.inspectedQty, i.passQty, i.reworkQty, i.rejectQty, renderJudgment(i.judgment)
       ])
     );
-
-    const allDefects = {};
-    inspections.forEach(i => {
-      Object.entries(i.defects || {}).forEach(([d, n]) => {
-        allDefects[d] = (allDefects[d] || 0) + n;
-      });
-    });
-    if (Object.keys(allDefects).length > 0) {
-      printSection('疵点汇总');
-      const defectRows = Object.entries(allDefects)
-        .sort((a, b) => b[1] - a[1])
-        .map(([d, n]) => [d, n]);
-      printTable(['疵点类型', '累计数量'], defectRows);
-    }
-  } else {
-    printWarning('无质检记录');
   }
 
   const boxes = storage.findBoxesByOrder(orderNo);
-  if (boxes.length > 0) {
-    const traceCodes = storage.findTraceCodesByOrder(orderNo);
-    printSection(`箱唛信息 (共${boxes.length}箱, 追溯码${traceCodes.length}个)`);
+  const codes = storage.findTraceCodesByOrder(orderNo);
+  const boxQty = boxes.reduce((s, b) => s + (b.qty || 0), 0);
+  printSection(`出货箱唛 (${boxes.length}箱, 合计${boxQty}件)`);
+  if (boxes.length === 0) {
+    printWarning('  无箱唛记录');
+  } else {
+    const rows = boxes.map(b => {
+      const bound = codes.find(c => c.boxNo === b.boxNo);
+      return [
+        b.boxNo, b.sequence, b.color || '-',
+        Object.entries(b.sizes || {}).map(([s, n]) => `${s}:${n}`).join(' '),
+        b.qty, `${b.grossWeight || '-'}/${b.netWeight || '-'}`,
+        formatDate(b.packDate),
+        bound ? `\x1b[32m✅ ${bound.code}\x1b[0m` : '\x1b[31m❌ 未绑定\x1b[0m'
+      ];
+    });
     printTable(
-      ['箱唛编号', '第N箱', '颜色', '件数', '毛重(kg)', '净重(kg)', '包装日期', '追溯码绑定'],
-      boxes.map(b => {
-        const hasCode = traceCodes.find(t => t.boxNo === b.boxNo);
-        return [
-          b.boxNo, b.sequence, b.color, b.qty,
-          b.grossWeight || '-', b.netWeight || '-', formatDate(b.packDate),
-          hasCode ? `\x1b[32m是\x1b[0m` : `\x1b[31m否\x1b[0m`
-        ];
-      })
+      ['箱唛编号', '序', '颜色', '尺码', '件数', '毛/净重(kg)', '包装日期', '追溯码'],
+      rows
     );
-    printInfo('查看某箱详情: gt query --boxNo <箱号>');
+    const missing = boxes.filter(b => !codes.find(c => c.boxNo === b.boxNo)).length;
+    if (missing > 0) {
+      printWarning(`  ⚠ 有 ${missing} 个箱子未绑定追溯码，补录: gt export --traceCodes --orderNo ${orderNo}`);
+    }
+    boxes.slice(0, 3).forEach(b => printInfo(`  ➜ 箱号追溯: gt query --boxNo ${b.boxNo}`));
+    if (boxes.length > 3) printInfo(`  ... 共 ${boxes.length} 箱，按需单独查询`);
+  }
+
+  const scanLogs = storage.findScanLogsByOrder(orderNo);
+  if (scanLogs.length > 0) {
+    printSection(`追溯码扫码记录 (${scanLogs.length}次)`);
+    const scanRows = scanLogs.slice(0, 10).map(l => [
+      formatDateTime(l.scannedAt), l.traceCode, l.boxNo, l.note || '(无备注)'
+    ]);
+    printTable(['扫码时间', '追溯码', '箱号', '备注'], scanRows);
+    if (scanLogs.length > 10) printInfo(`  仅展示最近 10 条，共 ${scanLogs.length} 条`);
   }
 
   return 0;
 }
 
-function queryByTraceCode(storage, code) {
+// ═══════════════════════════════════════════════════════════════
+// 追溯码查询 (支持扫码备注记录)
+// ═══════════════════════════════════════════════════════════════
+function queryByTraceCode(storage, code, scanNote) {
   const trace = storage.findTraceCode(code);
   if (!trace) {
     printWarning(`未找到追溯码: ${code}`);
     return 1;
   }
+
+  if (scanNote !== undefined || true) {
+    const scanLog = {
+      traceCode: code,
+      orderNo: trace.orderNo,
+      styleNo: trace.styleNo,
+      boxNo: trace.boxNo,
+      note: scanNote || '（系统自动记录一次查询）',
+      scannedAt: new Date().toISOString()
+    };
+    storage.addScanLog(scanLog);
+  }
+
+  const history = storage.findScanLogsByTraceCode(code);
+  const lastScan = history.length > 0 ? history[history.length - 1] : null;
 
   printHeader(`追溯码查询: ${code}`);
   printTable(
@@ -609,13 +829,32 @@ function queryByTraceCode(storage, code) {
       ['款号', trace.styleNo],
       ['箱号', trace.boxNo],
       ['生成时间', formatDateTime(trace.createdAt)],
-      ['扫描状态', trace.scanned ? '\x1b[32m已扫描\x1b[0m' : '未扫描']
+      ['累计查询次数', history.length + ' 次'],
+      ['最近查询时间', lastScan ? formatDateTime(lastScan.scannedAt) : '（本次首次）']
     ]
   );
 
+  if (scanNote) {
+    console.log();
+    printSuccess(`✅ 已记录本次扫码备注: "${scanNote}"`);
+  } else if (history.length > 0) {
+    printInfo(`ℹ 本次查询已自动计入扫码历史（累计${history.length}次），带备注: --traceCode XXX --scanNote "客户验收"`);
+  }
+
+  if (history.length > 0) {
+    printSection(`扫码历史记录 (最近 ${Math.min(10, history.length)} 条)`);
+    const display = history.slice(-10).reverse();
+    printTable(
+      ['时间', '备注'],
+      display.map(h => [formatDateTime(h.scannedAt), h.note || '-'])
+    );
+  }
+
   if (trace.boxNo) {
     console.log();
-    printInfo('关联箱唛：');
+    printInfo('═══════════════════════════════════════════════════════');
+    printInfo('📦 以下是该追溯码对应箱子的完整生产链路：');
+    printInfo('═══════════════════════════════════════════════════════');
     queryByBox(storage, trace.boxNo);
     return 0;
   }
@@ -625,6 +864,9 @@ function queryByTraceCode(storage, code) {
   return 0;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 箱号完整追溯 (串联全链路)
+// ═══════════════════════════════════════════════════════════════
 function queryByBox(storage, boxNo) {
   const box = storage.findBoxByNo(boxNo);
   if (!box) {
@@ -633,60 +875,177 @@ function queryByBox(storage, boxNo) {
     return 1;
   }
 
-  printHeader(`箱唛完整追溯: ${boxNo}`);
+  const on = box.orderNo;
+  const order = storage.findOrder(on) || {};
+  const materials = storage.findMaterialsByOrder(on);
+  const cuts = storage.findCuttingByOrder(on);
+  const sewing = storage.findSewingByOrder(on);
+  const groups = sewing.filter(s => s.process !== '整烫包装');
+  const ironPack = sewing.find(s => s.process === '整烫包装');
+  const inspections = storage.findInspectionsByBox(boxNo);
+  const boxInspStats = calculateReorderRate(inspections);
+  const allInsp = storage.findInspectionsByOrder(on);
+  const orderInspStats = calculateReorderRate(allInsp);
+  const codes = storage.findTraceCodesByOrder(on).filter(c => c.boxNo === boxNo);
+  const scanLogs = codes.length > 0 ? storage.findScanLogsByTraceCode(codes[0].code) : [];
+
+  printHeader(`📦 箱唛完整追溯链: ${boxNo}`);
+
+  printSection('① 箱唛基本信息');
   printTable(
     ['字段', '值'],
     [
       ['箱唛编号', box.boxNo],
-      ['订单号', box.orderNo],
+      ['第 N 箱', box.sequence + ' 箱'],
+      ['订单号', on],
       ['款号', box.styleNo],
-      ['客户', box.customer],
-      ['颜色', box.color],
-      ['第N箱', box.sequence],
-      ['件数', box.qty],
-      ['尺码分配', Object.entries(box.sizes || {}).map(([s, q]) => `${s}:${q}`).join(', ') || '-'],
-      ['毛重(kg)', box.grossWeight || '-'],
-      ['净重(kg)', box.netWeight || '-'],
+      ['款式名称', order.styleName || '-'],
+      ['客户', order.customer || '-'],
+      ['颜色', box.color || '-'],
+      ['本箱件数', box.qty + ' 件'],
+      ['尺码分配', Object.entries(box.sizes || {}).map(([s, q]) => `${s}:${q}`).join('  ') || '-'],
+      ['毛重/净重', `${box.grossWeight || '-'}kg / ${box.netWeight || '-'}kg`],
       ['外箱尺寸', box.measure || '-'],
-      ['封箱号', box.sealNo || '-'],
-      ['栈板号', box.palletNo || '-'],
-      ['包装员', box.packedBy || '-'],
-      ['包装日期', formatDate(box.packDate)],
-      ['状态', box.status]
+      ['封箱号/栈板号', `${box.sealNo || '-'} / ${box.palletNo || '-'}`],
+      ['包装员/包装日期', `${box.packedBy || '-'} / ${formatDate(box.packDate)}`]
     ]
   );
 
-  // 追溯码
-  const codes = storage.findTraceCodesByOrder(box.orderNo).filter(c => c.boxNo === boxNo);
-  if (codes.length > 0) {
-    printSection('关联追溯码');
-    codes.forEach(c => console.log(`  ${c.code}  (生成于 ${formatDateTime(c.createdAt)})`));
+  printSection(`② 关联追溯码 (${codes.length}个) + 扫码记录 (${scanLogs.length}次)`);
+  if (codes.length === 0) {
+    printWarning('  ⚠ 此箱暂无追溯码，建议生成: gt export --traceCodes --orderNo ' + on);
   } else {
-    printWarning('此箱暂无追溯码，建议生成: gt export --traceCodes --orderNo ' + box.orderNo);
+    const code = codes[0];
+    printTable(
+      ['字段', '值'],
+      [
+        ['追溯码', code.code],
+        ['生成时间', formatDateTime(code.createdAt)],
+        ['累计查询次数', scanLogs.length + ' 次'],
+        ['最近查询时间', scanLogs.length > 0 ? formatDateTime(scanLogs[scanLogs.length - 1].scannedAt) : '尚未查询']
+      ]
+    );
+    if (scanLogs.length > 0) {
+      const recent = scanLogs.slice(-5).reverse();
+      console.log('  最近扫码:');
+      recent.forEach(h => console.log(`    · ${formatDateTime(h.scannedAt)}  ${h.note || ''}`));
+    }
   }
 
-  // 本箱质检
-  const inspections = storage.findInspectionsByBox(boxNo);
-  if (inspections.length > 0) {
-    const stats = calculateReorderRate(inspections);
-    printSection(`本箱质检记录 (${inspections.length}次, 返工率${stats.rate}%)`);
-    inspections.forEach(i => {
-      console.log(`  检验员: ${i.inspector || '-'} | 日期: ${formatDate(i.inspectDate)}`);
-      console.log(`    抽检:${i.inspectedQty}  合格:${i.passQty}  返工:${i.reworkQty}  退货:${i.rejectQty}  判定:${renderJudgment(i.judgment)}`);
+  printSection(`③ 所属订单概况 (${on})`);
+  const codesAll = storage.findTraceCodesByOrder(on);
+  const boxesAll = storage.findBoxesByOrder(on);
+  printTable(
+    ['字段', '值'],
+    [
+      ['订单号 / 款号', `${on} / ${order.styleNo}`],
+      ['款式 / 客户', `${order.styleName || '-'} / ${order.customer || '-'}`],
+      ['订单数量 / 交期', `${order.qty}件 / ${order.deliveryDate ? formatDate(order.deliveryDate) : '-'}`],
+      ['订单状态', renderStatus(order.status)],
+      ['裁剪床次', `${cuts.length}床 / ${cuts.reduce((s, c) => s + (c.totalQty || 0), 0)}件`],
+      ['缝制组别', `${groups.length}组`],
+      ['出货箱数', `${boxesAll.length}箱 / ${boxesAll.reduce((s, b) => s + (b.qty || 0), 0)}件`],
+      ['整订单返工率', `${orderInspStats.rate}% (${allInsp.length}次质检/${orderInspStats.total}件抽检/${orderInspStats.rework}件返工)`],
+      ['追溯码绑定率', `${codesAll.length}/${boxesAll.length} 箱${codesAll.length < boxesAll.length ? ' ⚠有缺失' : ' ✅齐全'}`]
+    ]
+  );
+
+  if (materials.length > 0) {
+    printSection(`④ 本订单使用的面辅料批次 (${materials.length}条，全箱共用)`);
+    printTable(
+      ['类型', '分类', '名称', '编码', '缸号/批次', '颜色', '数量', '供应商'],
+      materials.map(m => [
+        m.type, m.category || '-', m.name, m.code || '-',
+        m.lotNo || m.batchNo || '\x1b[31m⚠缺号\x1b[0m',
+        m.color || '-', m.qty, m.supplier || '-'
+      ])
+    );
+  }
+
+  if (cuts.length > 0) {
+    printSection(`⑤ 关联裁剪床次 (${cuts.length}床)`);
+    printTable(
+      ['床次', '关联面料缸号', '层数', '拉布', '件数', '裁剪员', '日期'],
+      cuts.map(c => [
+        c.bedNo, c.fabricLot || '-', c.layers || '-', c.spreads || '-',
+        c.totalQty, c.cutter || '-', formatDate(c.cutDate)
+      ])
+    );
+  }
+
+  if (groups.length > 0) {
+    const sewDone = groups.reduce((s, g) => s + (g.completedQty || 0), 0);
+    printSection(`⑥ 缝制组别 (${groups.length}组, 累计完成${sewDone}件)`);
+    printTable(
+      ['组别', '组长', '人数', '分配', '完成', '不良数', '开线', '结束'],
+      groups.map(g => [
+        g.groupNo, g.leader || '-', g.members?.length || 0,
+        g.assignedQty || '-', g.completedQty || '-', g.defectQty || 0,
+        formatDate(g.startDate), formatDate(g.endDate)
+      ])
+    );
+  }
+
+  if (ironPack) {
+    printSection('⑦ 整烫包装记录');
+    printTable(
+      ['项目', '内容'],
+      [
+        ['整烫', `${formatDate(ironPack.ironDate) || '-'}  by ${ironPack.ironedBy || '-'}  (${ironPack.ironQty || '-'}件)`],
+        ['包装', `${formatDate(ironPack.packDate) || '-'}  by ${ironPack.packedBy || '-'}  (${ironPack.packQty || '-'}件)`],
+        ['计划总箱数', ironPack.boxCount || '-']
+      ]
+    );
+  }
+
+  printSection(`⑧ 本箱质检记录 (${inspections.length}次, 返工率${boxInspStats.rate}%)`);
+  if (inspections.length === 0) {
+    printWarning('  ⚠ 此箱暂无单独质检记录（可能是整批质检），可查看整订单质检: gt query --orderNo ' + on);
+  } else {
+    inspections.forEach((i, idx) => {
+      console.log(`  第 ${idx + 1} 次 | 检验员: ${i.inspector || '-'} | 日期: ${formatDate(i.inspectDate)} | 判定: ${renderJudgment(i.judgment)}`);
+      console.log(`    抽检:${i.inspectedQty}  合格:${i.passQty}  返工:${i.reworkQty}  退货:${i.rejectQty}`);
       if (Object.keys(i.defects || {}).length > 0) {
         const d = Object.entries(i.defects).map(([x, n]) => `${x}×${n}`).join('，');
         console.log(`    疵点: ${d}`);
       }
+      if (i.level) console.log(`    检验标准: ${i.level}`);
+      if (i.note) console.log(`    备注: ${i.note}`);
+      console.log();
     });
   }
 
-  // 继续跳转到订单
+  const allBoxesOfOrder = storage.findBoxesByOrder(on);
+  const totalQtyOfBoxes = allBoxesOfOrder.reduce((s, b) => s + (b.qty || 0), 0);
+  const packQty = ironPack ? (ironPack.packQty || 0) : 0;
+  if (packQty > 0 && totalQtyOfBoxes > 0 && packQty !== totalQtyOfBoxes) {
+    printSection('⚠️ 对账差异提醒');
+    printWarning(`  整烫包装记录 packQty=${packQty}件 vs 箱唛表合计=${totalQtyOfBoxes}件，差异 ${Math.abs(packQty - totalQtyOfBoxes)} 件`);
+    printInfo(`  补录建议: ${packQty > totalQtyOfBoxes ? '用 gt inspect --newBox 补开剩余箱唛' : '用 gt record-sew 更新 packQty'}`);
+  }
+
   console.log();
-  printInfo(`➜ 查看所属订单完整信息: gt query --orderNo ${box.orderNo}`);
+  printInfo('快捷跳转:');
+  printInfo(`  ➜ 整订单追溯: gt query --orderNo ${on}`);
+  printInfo(`  ➜ 整订单返工率: gt query --reworkRate --orderNo ${on}`);
+  printInfo(`  ➜ 查看下一箱/上一箱: gt query --boxNo ${generateNearbyBoxNo(allBoxesOfOrder, boxNo, -1) || '（已是第一箱）'}`);
+  printInfo(`  ➜ 打印箱唛标签: gt export --printBox ${boxNo}`);
 
   return 0;
 }
 
+function generateNearbyBoxNo(boxes, cur, delta) {
+  const list = boxes.map(b => b.boxNo).sort();
+  const idx = list.indexOf(cur);
+  if (idx === -1) return null;
+  const target = idx + delta;
+  if (target < 0 || target >= list.length) return null;
+  return list[target];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 列表 & 总览
+// ═══════════════════════════════════════════════════════════════
 function listUninspected(storage) {
   printHeader('未完成质检的订单');
 
@@ -774,6 +1133,7 @@ function showSummary(storage) {
   const totalBoxQty = boxes.reduce((s, b) => s + b.qty, 0);
   const codes = storage.getTraceCodes();
   const materials = storage.getMaterials();
+  const scanCount = storage.getScanLogs().length;
 
   printSection('核心指标');
   printTable(
@@ -793,6 +1153,7 @@ function showSummary(storage) {
       ['已生成箱数', boxes.length],
       ['已包装件数', totalBoxQty],
       ['追溯码数量', codes.length],
+      ['扫码查询次数', scanCount + ' 次'],
       ['无追溯码箱数', boxes.length - new Set(codes.map(c => c.boxNo)).size]
     ]
   );
@@ -811,6 +1172,7 @@ function showSummary(storage) {
 
   console.log();
   printInfo('常用查询:');
+  console.log('  ➜ 质量预警看板: gt query --alert --days 7');
   console.log('  ➜ 返工率分析:  gt query --reworkRate');
   console.log('  ➜ 未检订单:    gt query --uninspected');
   console.log('  ➜ 漏填校验:    gt export --validate');
@@ -818,7 +1180,7 @@ function showSummary(storage) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 参数解析（新增 --customer / --fromDate / --toDate / --lotNo / --materialBatch）
+// 参数解析 (新增: --alert / --days / --scanNote)
 // ═══════════════════════════════════════════════════════════════
 function parseArgs(args) {
   const opts = {};
@@ -833,10 +1195,12 @@ function parseArgs(args) {
     '--status': 'status',
     '--customer': 'customer',
     '--fromDate': 'fromDate', '--from-date': 'fromDate',
-    '--toDate': 'toDate', '--to-date': 'toDate'
+    '--toDate': 'toDate', '--to-date': 'toDate',
+    '--days': 'days',
+    '--scanNote': 'scanNote', '--scan-note': 'scanNote'
   };
 
-  const boolFlags = ['--uninspected', '--reworkRate', '--orders', '--summary', '--details'];
+  const boolFlags = ['--uninspected', '--reworkRate', '--orders', '--summary', '--details', '--alert'];
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -859,7 +1223,7 @@ function parseArgs(args) {
   if (args.includes('--orders')) opts.orders = true;
   if (args.includes('--summary')) opts.summary = true;
   if (args.includes('--details')) opts.withDetails = true;
-
+  if (args.includes('--alert')) opts.alert = true;
   return opts;
 }
 
@@ -902,6 +1266,18 @@ function printHelp() {
 多维度查询追溯信息，支持批次追踪和质量分析。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 质量预警看板 (新增)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  --alert                     最近7天质量预警 (默认)
+  --alert --days <N>          最近N天质量预警 (7/30常用)
+  输出:
+    · 总体趋势 (环比前N天变化)
+    · 风险订单排名 (🔴紧急/🟠高/🟡中/🔵低 + 风险评分)
+    · 疵点异常波动爆发提醒
+    · 按客户维度返工率排名
+    · 每条附: 环比变化↑↓、高发疵点建议、跳转命令
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📦 批次追溯（三维合一：面料缸号 / 辅料批次 / 质检批次）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   --batchNo <批次号>        自动匹配面料缸号、辅料批次、质检批次，输出:
@@ -911,50 +1287,58 @@ function printHelp() {
   --materialBatch <批次>    同上，专用入口（辅料批次）
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 返工率分析（多条件筛选）
+📊 返工率分析（多条件筛选 + 日期闭区间）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   --reworkRate                        全量返工率分析
   --reworkRate --customer <客户>      按客户筛选
   --reworkRate --styleNo <款号>       按款号筛选
   --reworkRate --orderNo <订单号>     按订单筛选
-  --reworkRate --fromDate <YYYY-MM-DD>   质检日期起
-  --reworkRate --toDate   <YYYY-MM-DD>   质检日期止
+  --reworkRate --fromDate <YYYY-MM-DD>   质检日期起 (含当天全天)
+  --reworkRate --toDate   <YYYY-MM-DD>   质检日期止 (含当天全天)
+  ✨ 额外显示: 实际命中最早/最晚质检日期，方便核对
 
-  输出内容: 总体指标 / 订单返工率Top10 / 重点关注订单预警(带行动建议)
+  输出内容: 时间范围确认 / 总体指标 / 订单返工率Top10 / 重点关注订单预警
            / 按客户维度汇总 / 疵点TOP10(含分布图+改进建议)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔍 精确查询
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  --orderNo <订单号>        订单全链路追溯
-  --styleNo <款号>          款号聚合追溯（所有关联订单 + 综合统计）
-  --boxNo <箱号>            箱唛完整追溯（质检+追溯码+跳转订单）
-  --traceCode <追溯码>      追溯码解码查询
+  --orderNo <订单号>        订单全链路追溯 (含扫码记录)
+  --styleNo <款号>          款号聚合追溯
+  --boxNo <箱号>            ✨箱唛完整追溯链(8段式):
+                              ①箱唛基本 ②追溯码+扫码 ③订单概况
+                              ④面辅料批次 ⑤裁剪床次 ⑥缝制组别
+                              ⑦整烫包装 ⑧质检记录 + 对账差异提醒
+  --traceCode <追溯码>                  追溯码解码 (自动记录扫码)
+  --traceCode XXX --scanNote "备注"     扫码时附加备注 (如:客户验收/仓管入库)
+  ✨ 每次查询自动记录扫码时间+次数+最近查询时间
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 列表类查询
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  --uninspected             未完成质检的订单 (含最近质检日期)
+  --uninspected             未完成质检的订单
   --orders                  所有订单清单
   --orders --status <状态>  按状态筛选订单
-  --summary                 项目总览（默认）
+  --summary                 项目总览（默认，含扫码次数）
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 示例:
-  # 批次追踪 (查面料缸号/辅料批次/质检批次，任何一种都可以)
-  gt query --batchNo DYE20260608
-  gt query --batchNo B20260605-Z
+  # 质量预警
+  gt query --alert --days 7
+  gt query --alert --days 30
 
-  # 返工率分析（各种筛选组合）
+  # 批次追踪 (查面料缸号/辅料批次/质检批次，任何一种都行)
+  gt query --batchNo DYE20260608
+  gt query --lotNo DYE20260608A
+
+  # 返工率分析（各种筛选 + 日期全天闭区间）
   gt query --reworkRate
-  gt query --reworkRate --customer 优衣库 --fromDate 2026-06-01
+  gt query --reworkRate --customer 优衣库 --fromDate 2026-06-01 --toDate 2026-06-30
   gt query --reworkRate --styleNo JX-A001
-  gt query --reworkRate --orderNo PO2026001
 
   # 精确查询
-  gt query --orderNo PO2026001
-  gt query --boxNo JXA001-6001-0001
-  gt query --traceCode GT-ABCD1234EFGH5678
+  gt query --boxNo JXA001-6001-0001        (一次看全链路)
+  gt query --traceCode GT-ABCD1234 --scanNote "客户QC现场扫码"
 `);
 }
 

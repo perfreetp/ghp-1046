@@ -8,7 +8,7 @@
     "address": ""
   },
   "order": {
-    "id": "ORD-MQ5J8OC67SH5FD",
+    "id": "ORD-MQ5JYX4YL4FCYU",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "styleName": "男士圆领短袖T恤",
@@ -46,7 +46,7 @@
       "supplier": "华纺纺织",
       "qty": 3500,
       "unit": "米",
-      "receivedDate": "2026-06-08T18:16:39.702Z",
+      "receivedDate": "2026-06-08T18:37:04.157Z",
       "inspectionResult": "PASS",
       "remark": ""
     },
@@ -63,7 +63,7 @@
       "supplier": "华纺纺织",
       "qty": 320,
       "unit": "米",
-      "receivedDate": "2026-06-08T18:16:39.792Z",
+      "receivedDate": "2026-06-08T18:37:04.252Z",
       "inspectionResult": "PENDING",
       "remark": ""
     },
@@ -80,7 +80,7 @@
       "supplier": "YKK",
       "qty": 5200,
       "unit": "条",
-      "receivedDate": "2026-06-08T18:16:39.887Z",
+      "receivedDate": "2026-06-08T18:37:04.347Z",
       "inspectionResult": "PENDING",
       "remark": ""
     },
@@ -97,7 +97,7 @@
       "supplier": "华丽织标",
       "qty": 5100,
       "unit": "个",
-      "receivedDate": "2026-06-08T18:16:39.984Z",
+      "receivedDate": "2026-06-08T18:37:04.442Z",
       "inspectionResult": "PENDING",
       "remark": ""
     },
@@ -114,7 +114,7 @@
       "supplier": "金辉印刷",
       "qty": 5100,
       "unit": "个",
-      "receivedDate": "2026-06-08T18:16:40.073Z",
+      "receivedDate": "2026-06-08T18:37:04.541Z",
       "inspectionResult": "PENDING",
       "remark": ""
     }
@@ -181,7 +181,7 @@
       }
     ],
     "ironPack": {
-      "id": "SEW-MQ5J8PVF0HIBGL",
+      "id": "SEW-MQ5JYYOALVDCUH",
       "orderNo": "PO2026001",
       "styleNo": "JX-A001",
       "groupNo": "0",
@@ -189,12 +189,12 @@
       "ironDate": "2026-06-20T00:00:00.000Z",
       "ironedBy": "陈师傅,马师傅",
       "ironQty": 4980,
-      "recordedAt": "2026-06-08T18:16:41.211Z",
+      "recordedAt": "2026-06-08T18:37:05.674Z",
       "packDate": "2026-06-21T00:00:00.000Z",
       "packedBy": "王霞,周敏,刘芳",
       "packQty": 4980,
       "boxCount": 208,
-      "updatedAt": "2026-06-08T18:16:41.300Z"
+      "updatedAt": "2026-06-08T18:37:05.766Z"
     }
   },
   "inspection": {
@@ -370,7 +370,7 @@
         "sealNo": "SL000002",
         "palletNo": "",
         "packedBy": "",
-        "packDate": "2026-06-08T18:16:41.774Z",
+        "packDate": "2026-06-08T18:37:06.231Z",
         "status": "PACKED",
         "remark": ""
       },
@@ -394,7 +394,7 @@
         "sealNo": "SL000003",
         "palletNo": "",
         "packedBy": "",
-        "packDate": "2026-06-08T18:16:41.867Z",
+        "packDate": "2026-06-08T18:37:06.326Z",
         "status": "PACKED",
         "remark": ""
       }
@@ -404,34 +404,39 @@
     "totalTraceCodes": 3,
     "traceCodes": [
       {
-        "code": "GT-FE98E52ED07AD9BF",
+        "code": "GT-1A568CE1BA97D204",
         "orderNo": "PO2026001",
         "styleNo": "JX-A001",
         "boxNo": "JXA001-6001-0001",
         "type": "BOX",
-        "createdAt": "2026-06-08T18:16:41.680Z",
+        "createdAt": "2026-06-08T18:37:06.141Z",
         "scanned": false
       },
       {
-        "code": "GT-1B44D6E5C0A3BB12",
+        "code": "GT-5C51F5359B4F2600",
         "orderNo": "PO2026001",
         "styleNo": "JX-A001",
         "boxNo": "JXA001-6001-0002",
         "type": "BOX",
-        "createdAt": "2026-06-08T18:16:41.777Z",
+        "createdAt": "2026-06-08T18:37:06.233Z",
         "scanned": false
       },
       {
-        "code": "GT-B8647DFA69C0C223",
+        "code": "GT-1149EC6FA1923299",
         "orderNo": "PO2026001",
         "styleNo": "JX-A001",
         "boxNo": "JXA001-6001-0003",
         "type": "BOX",
-        "createdAt": "2026-06-08T18:16:41.870Z",
+        "createdAt": "2026-06-08T18:37:06.328Z",
         "scanned": false
       }
     ],
     "missingTraceCodeBoxes": []
   },
-  "generatedAt": "2026-06-08T18:16:43.709Z"
+  "scanLogs": {
+    "totalScanCount": 0,
+    "uniqueCodesScanned": 0,
+    "logs": []
+  },
+  "generatedAt": "2026-06-08T18:37:08.159Z"
 }
