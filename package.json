@@ -1,0 +1,27 @@
+{
+  "name": "garment-trace",
+  "version": "1.0.0",
+  "description": "服装质检追溯器 - 成衣工厂本地订单、面辅料、工序和抽检记录管理工具",
+  "main": "src/index.js",
+  "bin": {
+    "garment-trace": "./bin/garment-trace.js",
+    "gt": "./bin/garment-trace.js"
+  },
+  "scripts": {
+    "start": "node ./bin/garment-trace.js",
+    "test": "node ./test/run-tests.js"
+  },
+  "keywords": [
+    "garment",
+    "quality",
+    "traceability",
+    "factory",
+    "inspection",
+    "cli"
+  ],
+  "author": "Garment Trace Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

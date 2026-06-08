@@ -1,0 +1,50 @@
+[
+  {
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "styleName": "男士圆领短袖T恤",
+    "customer": "优衣库",
+    "customerPo": "UNIQLO-2026-PO001",
+    "qty": 5000,
+    "unitPrice": 25.50,
+    "color": "白色",
+    "sizeRange": "S-XXL",
+    "sizes": "S:800,M:1200,L:1500,XL:1000,XXL:500",
+    "deliveryDate": "2026-08-15",
+    "orderDate": "2026-06-01",
+    "season": "2026SS",
+    "remark": "经典款圆领T恤"
+  },
+  {
+    "orderNo": "PO2026002",
+    "styleNo": "JX-B002",
+    "styleName": "女士收腰连衣裙",
+    "customer": "HM",
+    "customerPo": "HM-SUM-0892",
+    "qty": 3000,
+    "unitPrice": 68.00,
+    "color": "碎花",
+    "sizeRange": "S-XL",
+    "sizes": "S:600,M:900,L:1000,XL:500",
+    "deliveryDate": "2026-07-30",
+    "orderDate": "2026-06-05",
+    "season": "2026SS",
+    "remark": "雪纺碎花连衣裙"
+  },
+  {
+    "orderNo": "PO2026003",
+    "styleNo": "JX-C003",
+    "styleName": "儿童纯棉卫衣套装",
+    "customer": "西松屋",
+    "customerPo": "NISHI-26-055",
+    "qty": 8000,
+    "unitPrice": 42.00,
+    "color": "藏青",
+    "sizeRange": "90-140",
+    "sizes": "90:1500,100:1800,110:1800,120:1500,130:1000,140:400",
+    "deliveryDate": "2026-08-10",
+    "orderDate": "2026-06-08",
+    "season": "2026AW",
+    "remark": "秋冬毛圈套装"
+  }
+]
