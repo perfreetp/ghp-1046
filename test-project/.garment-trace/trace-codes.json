@@ -1,29 +1,29 @@
 [
   {
-    "code": "GT-1A568CE1BA97D204",
+    "code": "GT-E472A2D53B5FDC84",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "boxNo": "JXA001-6001-0001",
     "type": "BOX",
-    "createdAt": "2026-06-08T18:37:06.141Z",
+    "createdAt": "2026-06-08T18:57:01.581Z",
     "scanned": false
   },
   {
-    "code": "GT-5C51F5359B4F2600",
+    "code": "GT-1AC54042B605C767",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "boxNo": "JXA001-6001-0002",
     "type": "BOX",
-    "createdAt": "2026-06-08T18:37:06.233Z",
+    "createdAt": "2026-06-08T18:57:01.674Z",
     "scanned": false
   },
   {
-    "code": "GT-1149EC6FA1923299",
+    "code": "GT-6DE554D36D4F23FE",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "boxNo": "JXA001-6001-0003",
     "type": "BOX",
-    "createdAt": "2026-06-08T18:37:06.328Z",
+    "createdAt": "2026-06-08T18:57:01.777Z",
     "scanned": false
   }
 ]

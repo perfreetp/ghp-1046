@@ -1,6 +1,6 @@
 [
   {
-    "id": "MAT-MQ5JYXI5JXM9H2",
+    "id": "MAT-MQ5KOJXQ6E01OI",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "type": "面料",
@@ -13,13 +13,13 @@
     "supplier": "华纺纺织",
     "qty": 3500,
     "unit": "米",
-    "receivedDate": "2026-06-08T18:37:04.157Z",
+    "receivedDate": "2026-06-08T18:56:59.630Z",
     "inspectionResult": "PASS",
     "remark": "",
-    "linkedAt": "2026-06-08T18:37:04.157Z"
+    "linkedAt": "2026-06-08T18:56:59.631Z"
   },
   {
-    "id": "MAT-MQ5JYXKSKIX4HO",
+    "id": "MAT-MQ5KOK0GOAC3SR",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "type": "面料",
@@ -32,13 +32,13 @@
     "supplier": "华纺纺织",
     "qty": 320,
     "unit": "米",
-    "receivedDate": "2026-06-08T18:37:04.252Z",
+    "receivedDate": "2026-06-08T18:56:59.728Z",
     "inspectionResult": "PENDING",
     "remark": "",
-    "linkedAt": "2026-06-08T18:37:04.252Z"
+    "linkedAt": "2026-06-08T18:56:59.728Z"
   },
   {
-    "id": "MAT-MQ5JYXNFBUF5KY",
+    "id": "MAT-MQ5KOK33L9V4R3",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "type": "辅料",
@@ -51,13 +51,13 @@
     "supplier": "YKK",
     "qty": 5200,
     "unit": "条",
-    "receivedDate": "2026-06-08T18:37:04.347Z",
+    "receivedDate": "2026-06-08T18:56:59.823Z",
     "inspectionResult": "PENDING",
     "remark": "",
-    "linkedAt": "2026-06-08T18:37:04.347Z"
+    "linkedAt": "2026-06-08T18:56:59.823Z"
   },
   {
-    "id": "MAT-MQ5JYXQ277A4X5",
+    "id": "MAT-MQ5KOK5KU5218P",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "type": "辅料",
@@ -70,13 +70,13 @@
     "supplier": "华丽织标",
     "qty": 5100,
     "unit": "个",
-    "receivedDate": "2026-06-08T18:37:04.442Z",
+    "receivedDate": "2026-06-08T18:56:59.912Z",
     "inspectionResult": "PENDING",
     "remark": "",
-    "linkedAt": "2026-06-08T18:37:04.442Z"
+    "linkedAt": "2026-06-08T18:56:59.913Z"
   },
   {
-    "id": "MAT-MQ5JYXSTXOPF4H",
+    "id": "MAT-MQ5KOK866GQJ0P",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "type": "辅料",
@@ -89,9 +89,9 @@
     "supplier": "金辉印刷",
     "qty": 5100,
     "unit": "个",
-    "receivedDate": "2026-06-08T18:37:04.541Z",
+    "receivedDate": "2026-06-08T18:57:00.007Z",
     "inspectionResult": "PENDING",
     "remark": "",
-    "linkedAt": "2026-06-08T18:37:04.541Z"
+    "linkedAt": "2026-06-08T18:57:00.007Z"
   }
 ]

@@ -16,6 +16,10 @@ function queryCommand(args, storage) {
   // ═══════════════════════════════════════
   // 路由逻辑：统计/看板类命令最优先
   // ═══════════════════════════════════════
+  if (opts.handleStatus) {
+    return handleRiskHandling(storage, opts);
+  }
+
   if (opts.alert) {
     return showQualityAlert(storage, opts);
   }
@@ -74,30 +78,59 @@ function queryCommand(args, storage) {
 // ═══════════════════════════════════════════════════════════════
 function showQualityAlert(storage, opts = {}) {
   const days = parseInt(opts.days || '7', 10);
-  const now = Date.now();
-  const daysAgo = new Date(now - days * 86400000);
-  daysAgo.setHours(0, 0, 0, 0);
-  const daysAgoTs = daysAgo.getTime();
+  const today = opts.toDate ? new Date(opts.toDate) : new Date();
+  today.setHours(23, 59, 59, 999);
+  const todayTs = today.getTime();
+  const curStart = new Date(today.getTime() - (days - 1) * 86400000);
+  curStart.setHours(0, 0, 0, 0);
+  const curStartTs = curStart.getTime();
 
-  printHeader(`质量预警看板 (最近 ${days} 天 · ${formatDate(daysAgo)} ~ 今日)`);
+  const prevEnd = new Date(curStartTs - 1);
+  prevEnd.setHours(23, 59, 59, 999);
+  const prevStart = new Date(prevEnd.getTime() - (days - 1) * 86400000);
+  prevStart.setHours(0, 0, 0, 0);
+
+  printHeader(`质量预警看板 (最近 ${days} 天 · ${formatDate(curStart)} ~ ${formatDate(today)})`);
 
   const allInsp = storage.getInspections();
-  const recentInsp = allInsp.filter(i => new Date(i.inspectDate).getTime() >= daysAgoTs);
+  const recentInsp = allInsp.filter(i => {
+    const t = new Date(i.inspectDate).getTime();
+    return t >= curStartTs && t <= todayTs;
+  });
   const orders = storage.getOrders();
 
+  const prevInsp = allInsp.filter(i => {
+    const t = new Date(i.inspectDate).getTime();
+    return t >= prevStart.getTime() && t <= prevEnd.getTime();
+  });
+
+  // ── 1. 统计窗口确认表 ──
+  let actualFirst = null, actualLast = null, hitCount = 0;
+  if (recentInsp.length > 0) {
+    const sorted = recentInsp.slice().sort((a, b) => new Date(a.inspectDate) - new Date(b.inspectDate));
+    actualFirst = sorted[0].inspectDate;
+    actualLast = sorted[sorted.length - 1].inspectDate;
+    hitCount = sorted.length;
+  }
+
+  printSection('统计窗口确认');
+  printTable(
+    ['项目', '起', '止', '备注'],
+    [
+      ['当前统计窗口', formatDateTime(curStart), formatDateTime(today), `最近${days}天（不含未来日期）`],
+      ['实际命中质检', actualFirst ? formatDateTime(actualFirst) : '—', actualLast ? formatDateTime(actualLast) : '—', `共${hitCount}次记录`],
+      ['环比对比窗口', formatDateTime(prevStart), formatDateTime(prevEnd), `前${days}天（平移对照）`]
+    ]
+  );
+
   if (recentInsp.length === 0) {
-    printWarning(`最近 ${days} 天暂无质检记录`);
+    console.log();
+    printWarning(`最近 ${days} 天暂无质检记录，建议先录入数据`);
+    printInfo(`录入命令: gt inspect --orderNo <订单号> --inspectedQty <数量> --judgment PASS`);
     return 0;
   }
 
-  // ── 指标：对比前一段（环比） ──
-  const prevEndTs = daysAgoTs - 1;
-  const prevStartTs = daysAgoTs - days * 86400000;
-  const prevInsp = allInsp.filter(i => {
-    const t = new Date(i.inspectDate).getTime();
-    return t >= prevStartTs && t <= prevEndTs;
-  });
-
+  // ── 2. 指标：对比前一段（环比） ──
   const curStats = calculateReorderRate(recentInsp);
   const prevStats = calculateReorderRate(prevInsp);
   const rateDelta = (curStats.rate - prevStats.rate).toFixed(2);
@@ -115,7 +148,7 @@ function showQualityAlert(storage, opts = {}) {
     ]
   );
 
-  // ── 按订单维度统计：返工率、退货数、疵点爆发 ──
+  // ── 3. 按订单维度统计：返工率、退货数、疵点爆发 ──
   const orderMap = {};
   recentInsp.forEach(i => {
     if (!orderMap[i.orderNo]) {
@@ -143,7 +176,10 @@ function showQualityAlert(storage, opts = {}) {
     if (new Date(i.inspectDate) > new Date(s.lastInsp)) s.lastInsp = i.inspectDate;
   });
 
-  // ── 计算每条风险评分 ──
+  // 处置状态表（所有订单最新处置）
+  const latestHandlingMap = storage.getAllLatestRiskHandlings();
+
+  // ── 4. 计算每条风险评分 ──
   const alerts = [];
   Object.values(orderMap).forEach(s => {
     const reworkRate = s.totalInsp > 0 ? (s.reworkQty / s.totalInsp) * 100 : 0;
@@ -176,20 +212,50 @@ function showQualityAlert(storage, opts = {}) {
     s.reasons = reasons;
     s.score = score;
 
+    // 附加上最新处置记录
+    s.latestHandling = latestHandlingMap[s.orderNo] || null;
+
     if (score > 0) alerts.push(s);
   });
 
   alerts.sort((a, b) => b.score - a.score);
 
-  if (alerts.length === 0) {
+  // 隐藏已关闭
+  let displayAlerts = alerts;
+  let closedCount = 0;
+  if (opts.hideClosed) {
+    displayAlerts = alerts.filter(s => !s.latestHandling || s.latestHandling.status !== 'CLOSED');
+    closedCount = alerts.length - displayAlerts.length;
+  }
+
+  if (displayAlerts.length === 0) {
     console.log();
-    printSuccess(`✅ 最近 ${days} 天暂无高风险订单，品质表现稳定！`);
+    if (closedCount > 0) {
+      printSuccess(`✅ 共 ${alerts.length} 条风险，已全部处理关闭！(已隐藏 ${closedCount} 条已关闭)`);
+    } else {
+      printSuccess(`✅ 最近 ${days} 天暂无高风险订单，品质表现稳定！`);
+    }
     return 0;
   }
 
-  printSection(`需要关注的订单 (共 ${alerts.length} 个，按风险优先级排序)`);
+  const statusRender = (st) => ({
+    PENDING: '\x1b[35m🟣 待处理\x1b[0m',
+    NOTIFIED: '\x1b[36m🔵 已通知组长\x1b[0m',
+    REINSPECTED: '\x1b[33m🟡 已复检\x1b[0m',
+    CLOSED: '\x1b[32m🟢 已关闭\x1b[0m'
+  }[st] || '\x1b[35m🟣 待处理\x1b[0m');
 
-  alerts.forEach((s, idx) => {
+  const totalPending = alerts.filter(s => !s.latestHandling || s.latestHandling.status === 'PENDING').length;
+  const totalNotified = alerts.filter(s => s.latestHandling && s.latestHandling.status === 'NOTIFIED').length;
+  const totalReinspected = alerts.filter(s => s.latestHandling && s.latestHandling.status === 'REINSPECTED').length;
+  const totalClosed = alerts.filter(s => s.latestHandling && s.latestHandling.status === 'CLOSED').length;
+
+  printSection(`需要关注的订单 (共显示 ${displayAlerts.length}/${alerts.length} 个 · 待处理${totalPending} 已通知${totalNotified} 已复检${totalReinspected} 已关闭${totalClosed} · 按风险优先级排序)`);
+  if (closedCount > 0) {
+    printInfo(`已隐藏 ${closedCount} 条已关闭订单，不加 --hideClosed 可查看全部`);
+  }
+
+  displayAlerts.forEach((s, idx) => {
     const badge = s.score >= 100 ? '\x1b[31m🔴 紧急\x1b[0m'
       : s.score >= 60 ? '\x1b[33m🟠 高\x1b[0m'
         : s.score >= 30 ? '\x1b[33m🟡 中\x1b[0m'
@@ -205,11 +271,20 @@ function showQualityAlert(storage, opts = {}) {
     console.log(`      质检日期: ${formatDate(s.firstInsp)} ~ ${formatDate(s.lastInsp)}`);
     console.log(`      风险原因: ${s.reasons.join('  ')}`);
     if (s.topDefect) console.log(`      最高发疵点: ${s.topDefect[0]} × ${s.topDefect[1]}  → 建议: ${getDefectSuggestion(s.topDefect[0])}`);
+
+    // 处置状态闭环
+    if (s.latestHandling) {
+      console.log(`      处置状态: ${statusRender(s.latestHandling.status)}  |  负责人: ${s.latestHandling.handledBy || '-'}  |  处理时间: ${formatDateTime(s.latestHandling.handledAt)}`);
+      if (s.latestHandling.note) console.log(`      最近备注: "${s.latestHandling.note}"`);
+    } else {
+      console.log(`      处置状态: ${statusRender('PENDING')}  (尚未登记处置)`);
+    }
+    console.log(`      处置命令: gt query --alert --handleStatus PENDING|NOTIFIED|REINSPECTED|CLOSED --orderNo ${s.orderNo} --handleBy <姓名> --handleNote "备注"`);
     console.log(`      ➜ 查看详情: gt query --orderNo ${s.orderNo}`);
     console.log(`      ➜ 返工率分析: gt query --reworkRate --orderNo ${s.orderNo}`);
   });
 
-  // ── 全维度疵点爆发汇总 ──
+  // ── 5. 全维度疵点爆发汇总 ──
   const allDefects = {};
   recentInsp.forEach(i => {
     Object.entries(i.defects || {}).forEach(([d, n]) => {
@@ -244,7 +319,7 @@ function showQualityAlert(storage, opts = {}) {
     });
   }
 
-  // ── 客户维度TOP3 ──
+  // ── 6. 客户维度TOP5 ──
   const custMap = {};
   recentInsp.forEach(i => {
     const o = storage.findOrder(i.orderNo) || {};
@@ -269,7 +344,8 @@ function showQualityAlert(storage, opts = {}) {
   console.log();
   printInfo('快捷操作:');
   console.log(`  ➜ 调整窗口: gt query --alert --days 30`);
-  console.log(`  ➜ 整体返工率: gt query --reworkRate --fromDate ${formatDate(daysAgo)}`);
+  console.log(`  ➜ 隐藏已关闭: gt query --alert --days ${days} --hideClosed`);
+  console.log(`  ➜ 整体返工率: gt query --reworkRate --fromDate ${formatDate(curStart)} --toDate ${formatDate(today)}`);
 
   return 0;
 }
@@ -351,7 +427,7 @@ function queryByBatch(storage, batchNo) {
     printTable(
       ['订单号', '床次', '层数', '拉布匹数', '裁剪数', '裁剪员', '裁剪日期', '面料缸号'],
       displayCuts.map(c => [
-        c.orderNo, c.bedNo, c.layers || '-', c.spreads || '-',
+        c.orderNo, c.bedNo, c.layerCount || '-', c.spreads || '-',
         c.totalQty, c.cutter || '-', formatDate(c.cutDate), c.fabricLot || '-'
       ])
     );
@@ -694,7 +770,7 @@ function queryByOrder(storage, orderNo, withDetails) {
     printTable(
       ['床次', '面料缸号', '层数', '拉布', '件数', '裁剪员', '裁剪日期'],
       cuts.map(c => [
-        c.bedNo, c.fabricLot || '-', c.layers || '-', c.spreads || '-',
+        c.bedNo, c.fabricLot || '-', c.layerCount || '-', c.spreads || '-',
         c.totalQty, c.cutter || '-', formatDate(c.cutDate)
       ])
     );
@@ -967,7 +1043,7 @@ function queryByBox(storage, boxNo) {
     printTable(
       ['床次', '关联面料缸号', '层数', '拉布', '件数', '裁剪员', '日期'],
       cuts.map(c => [
-        c.bedNo, c.fabricLot || '-', c.layers || '-', c.spreads || '-',
+        c.bedNo, c.fabricLot || '-', c.layerCount || '-', c.spreads || '-',
         c.totalQty, c.cutter || '-', formatDate(c.cutDate)
       ])
     );
@@ -1180,7 +1256,80 @@ function showSummary(storage) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 参数解析 (新增: --alert / --days / --scanNote)
+// 风险处置：标记状态 + 备注 + 负责人
+// ═══════════════════════════════════════════════════════════════
+function handleRiskHandling(storage, opts) {
+  const validStatuses = ['PENDING', 'NOTIFIED', 'REINSPECTED', 'CLOSED'];
+  const statusCnMap = { PENDING: '🟣 待处理', NOTIFIED: '🔵 已通知组长', REINSPECTED: '🟡 已复检', CLOSED: '🟢 已关闭' };
+
+  let status = String(opts.handleStatus || '').toUpperCase();
+  if (!validStatuses.includes(status)) {
+    printError(`--handleStatus 必须是: ${validStatuses.join(' / ')}`);
+    printInfo(`示例: gt query --alert --handleStatus NOTIFIED --orderNo PO2026001 --handleBy "质检主管" --handleNote "已通知李组长排查跳线问题"`);
+    return 1;
+  }
+  if (!opts.orderNo) {
+    printError('处置标记必须指定 --orderNo <订单号>');
+    return 1;
+  }
+  const order = storage.findOrder(opts.orderNo);
+  if (!order) {
+    printError(`订单 ${opts.orderNo} 不存在`);
+    return 1;
+  }
+
+  const record = {
+    id: 'RH-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase(),
+    orderNo: opts.orderNo,
+    styleNo: order.styleNo || '',
+    customer: order.customer || '',
+    status: status,
+    handledBy: opts.handleBy || '',
+    note: opts.handleNote || '',
+    handledAt: new Date().toISOString()
+  };
+
+  storage.addRiskHandling(record);
+
+  printHeader(`风险处置记录成功`);
+  printTable(
+    ['字段', '值'],
+    [
+      ['处置ID', record.id],
+      ['订单号 / 款号', `${record.orderNo} / ${record.styleNo || '-'}`],
+      ['客户', record.customer || '-'],
+      ['处置状态', statusCnMap[status] + ` (${status})`],
+      ['负责人', record.handledBy || '(未填)'],
+      ['处理备注', record.note || '(未填)'],
+      ['处理时间', formatDateTime(record.handledAt)]
+    ]
+  );
+
+  const prevList = storage.findRiskHandlingsByOrder(opts.orderNo).sort((a, b) => new Date(b.handledAt) - new Date(a.handledAt));
+  if (prevList.length > 1) {
+    console.log();
+    printSection('该订单历史处置记录');
+    printTable(
+      ['时间', '状态', '负责人', '备注'],
+      prevList.slice(0, 10).map(r => [
+        formatDateTime(r.handledAt),
+        statusCnMap[r.status] || r.status,
+        r.handledBy || '-',
+        r.note || '-'
+      ])
+    );
+  }
+
+  console.log();
+  printInfo('快捷操作:');
+  printInfo(`  ➜ 查看预警看板: gt query --alert --days 7`);
+  printInfo(`  ➜ 隐藏已关闭订单: gt query --alert --days 7 --hideClosed`);
+  printInfo(`  ➜ 查看订单详情: gt query --orderNo ${opts.orderNo}`);
+  return 0;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 参数解析 (新增: --alert / --days / --scanNote / --handle* / --hideClosed)
 // ═══════════════════════════════════════════════════════════════
 function parseArgs(args) {
   const opts = {};
@@ -1197,10 +1346,13 @@ function parseArgs(args) {
     '--fromDate': 'fromDate', '--from-date': 'fromDate',
     '--toDate': 'toDate', '--to-date': 'toDate',
     '--days': 'days',
-    '--scanNote': 'scanNote', '--scan-note': 'scanNote'
+    '--scanNote': 'scanNote', '--scan-note': 'scanNote',
+    '--handleStatus': 'handleStatus', '--handle-status': 'handleStatus',
+    '--handleBy': 'handleBy', '--handle-by': 'handleBy',
+    '--handleNote': 'handleNote', '--handle-note': 'handleNote'
   };
 
-  const boolFlags = ['--uninspected', '--reworkRate', '--orders', '--summary', '--details', '--alert'];
+  const boolFlags = ['--uninspected', '--reworkRate', '--orders', '--summary', '--details', '--alert', '--hideClosed', '--hide-closed'];
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -1224,6 +1376,7 @@ function parseArgs(args) {
   if (args.includes('--summary')) opts.summary = true;
   if (args.includes('--details')) opts.withDetails = true;
   if (args.includes('--alert')) opts.alert = true;
+  if (args.includes('--hideClosed') || args.includes('--hide-closed')) opts.hideClosed = true;
   return opts;
 }
 
@@ -1266,16 +1419,27 @@ function printHelp() {
 多维度查询追溯信息，支持批次追踪和质量分析。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 质量预警看板 (新增)
+🚨 质量预警看板 (车间晨会用)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   --alert                     最近7天质量预警 (默认)
   --alert --days <N>          最近N天质量预警 (7/30常用)
+  --alert --days <N> --hideClosed   隐藏已关闭的风险订单
   输出:
+    · 统计窗口确认 (当前窗口/实际命中最早最晚质检/环比窗口)
     · 总体趋势 (环比前N天变化)
-    · 风险订单排名 (🔴紧急/🟠高/🟡中/🔵低 + 风险评分)
+    · 风险订单排名 (🔴紧急/🟠高/🟡中/🔵低 + 风险评分 + 处置状态)
     · 疵点异常波动爆发提醒
     · 按客户维度返工率排名
-    · 每条附: 环比变化↑↓、高发疵点建议、跳转命令
+    · 每条附: 环比变化↑↓、高发疵点建议、处置命令、跳转命令
+
+  🏷 风险处置闭环 (新增):
+  --handleStatus PENDING       标记: 🟣 待处理
+  --handleStatus NOTIFIED      标记: 🔵 已通知组长
+  --handleStatus REINSPECTED   标记: 🟡 已复检
+  --handleStatus CLOSED        标记: 🟢 已关闭
+  需配套: --orderNo <订单号> --handleBy <负责人> --handleNote "备注"
+  示例:
+    gt query --alert --handleStatus NOTIFIED --orderNo PO2026001 --handleBy 质检主管 --handleNote "已通知李组长排查跳线"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📦 批次追溯（三维合一：面料缸号 / 辅料批次 / 质检批次）

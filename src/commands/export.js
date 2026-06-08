@@ -63,6 +63,7 @@ function exportInspectionPackage(storage, opts) {
   const boxes = storage.findBoxesByOrder(orderNo);
   const traceCodes = storage.findTraceCodesByOrder(orderNo);
   const scanLogs = storage.findScanLogsByOrder(orderNo);
+  const riskHandlings = storage.findRiskHandlingsByOrder(orderNo);
   const stats = calculateReorderRate(inspections);
 
   const defectMap = {};
@@ -84,7 +85,7 @@ function exportInspectionPackage(storage, opts) {
       totalBeds: cuts.length,
       totalQty: cuts.reduce((s, c) => s + (c.totalQty || 0), 0),
       cutters: [...new Set(cuts.map(c => c.cutter).filter(Boolean))],
-      beds: cuts.map(c => ({ bedNo: c.bedNo, fabricLot: c.fabricLot, layers: c.layers, spreads: c.spreads, totalQty: c.totalQty, cutter: c.cutter, cutDate: c.cutDate }))
+      beds: cuts.map(c => ({ bedNo: c.bedNo, fabricLot: c.fabricLot, layers: c.layerCount, spreads: c.spreads, totalQty: c.totalQty, cutter: c.cutter, cutDate: c.cutDate }))
     },
     sewingSummary: {
       groups: sewing.filter(s => s.process !== '整烫包装').map(s => ({
@@ -125,37 +126,55 @@ function exportInspectionPackage(storage, opts) {
       uniqueCodesScanned: [...new Set(scanLogs.map(l => l.traceCode))].length,
       logs: scanLogs.map(l => ({ ...l, id: undefined }))
     },
+    riskHandlings: {
+      totalHandlingCount: riskHandlings.length,
+      latestStatus: (storage.findLatestRiskHandlingByOrder(orderNo) || {}).status || 'PENDING',
+      latestHandledBy: (storage.findLatestRiskHandlingByOrder(orderNo) || {}).handledBy || '',
+      latestNote: (storage.findLatestRiskHandlingByOrder(orderNo) || {}).note || '',
+      history: riskHandlings.slice().sort((a, b) => new Date(b.handledAt) - new Date(a.handledAt)).map(r => ({ ...r, id: undefined })).slice(0, 20)
+    },
+    qualityAlert: {
+      overallReworkRate: stats.rate,
+      totalRejects: inspections.reduce((s, i) => s + (i.rejectQty || 0), 0),
+      riskLevel: stats.rate >= 5 ? 'HIGH' : stats.rate >= 3 ? 'MEDIUM' : stats.rate >= 1 ? 'LOW' : 'GOOD',
+      topDefects: defectRanking.slice(0, 5),
+      window: {
+        inspectDateMin: inspections.length > 0 ? formatDate(inspections.slice().sort((a, b) => new Date(a.inspectDate) - new Date(b.inspectDate))[0].inspectDate) : '',
+        inspectDateMax: inspections.length > 0 ? formatDate(inspections.slice().sort((a, b) => new Date(b.inspectDate) - new Date(a.inspectDate))[0].inspectDate) : '',
+        totalInspections: inspections.length
+      }
+    },
     generatedAt: new Date().toISOString()
   };
 
   const jsonPath = path.join(outputDir, `inspection-report-${orderNo}.json`);
   fs.writeFileSync(jsonPath, JSON.stringify(summary, null, 2), 'utf-8');
-  printSuccess(`[1/9] 检验报告 JSON: ${path.basename(jsonPath)}`);
+  printSuccess(`[1/10] 检验报告 JSON: ${path.basename(jsonPath)}`);
 
   const csvContent = generateInspectionCSV(summary);
   const csvPath = path.join(outputDir, `inspection-report-${orderNo}.csv`);
   fs.writeFileSync(csvPath, '\uFEFF' + csvContent, 'utf-8');
-  printSuccess(`[2/9] 检验数据 CSV: ${path.basename(csvPath)}`);
+  printSuccess(`[2/10] 检验数据 CSV: ${path.basename(csvPath)}`);
 
   const boxesCSV = generateBoxesCSV(boxes);
   const boxesCsvPath = path.join(outputDir, `packing-list-${orderNo}.csv`);
   fs.writeFileSync(boxesCsvPath, '\uFEFF' + boxesCSV, 'utf-8');
-  printSuccess(`[3/9] 装箱单 CSV: ${path.basename(boxesCsvPath)}`);
+  printSuccess(`[3/10] 装箱单 CSV: ${path.basename(boxesCsvPath)}`);
 
   const defectsCSV = generateDefectsCSV(inspections);
   const defectsCsvPath = path.join(outputDir, `defect-summary-${orderNo}.csv`);
   fs.writeFileSync(defectsCsvPath, '\uFEFF' + defectsCSV, 'utf-8');
-  printSuccess(`[4/9] 疵点汇总 CSV: ${path.basename(defectsCsvPath)}`);
+  printSuccess(`[4/10] 疵点汇总 CSV: ${path.basename(defectsCsvPath)}`);
 
   const chainCSV = generateBatchTraceChainCSV(summary, materials, cuts, boxes, traceCodes);
   const chainCsvPath = path.join(outputDir, `batch-tracechain-${orderNo}.csv`);
   fs.writeFileSync(chainCsvPath, '\uFEFF' + chainCSV, 'utf-8');
-  printSuccess(`[5/9] 批次追溯链 CSV: ${path.basename(chainCsvPath)}`);
+  printSuccess(`[5/10] 批次追溯链 CSV: ${path.basename(chainCsvPath)}`);
 
   const reworkCSV = generateReworkAnalysisCSV(summary, inspections, order);
   const reworkCsvPath = path.join(outputDir, `rework-analysis-${orderNo}.csv`);
   fs.writeFileSync(reworkCsvPath, '\uFEFF' + reworkCSV, 'utf-8');
-  printSuccess(`[6/9] 返工率分析 CSV: ${path.basename(reworkCsvPath)}`);
+  printSuccess(`[6/10] 返工率分析 CSV: ${path.basename(reworkCsvPath)}`);
 
   if (traceCodes.length === 0 && opts.generateCodes) {
     printInfo('批量生成追溯码...');
@@ -177,12 +196,12 @@ function exportInspectionPackage(storage, opts) {
       tsv += `${c.code}\t${c.orderNo}\t${c.styleNo}\t${c.boxNo}\t${formatDateTime(c.createdAt)}\n`;
     });
     fs.writeFileSync(codesTsvPath, tsv, 'utf-8');
-    printSuccess(`[7/9] 追溯码清单 TSV: ${path.basename(codesTsvPath)}`);
+    printSuccess(`[7/10] 追溯码清单 TSV: ${path.basename(codesTsvPath)}`);
     summary.traceability.totalTraceCodes = latestCodes.length;
     summary.traceability.traceCodes = latestCodes.map(c => ({ ...c, id: undefined }));
     summary.traceability.missingTraceCodeBoxes = boxes.filter(b => !latestCodes.find(c => c.boxNo === b.boxNo)).map(b => b.boxNo);
   } else {
-    printWarning(`[7/9] 追溯码清单: 暂无追溯码 (使用 --generateCodes 自动生成)`);
+    printWarning(`[7/10] 追溯码清单: 暂无追溯码 (使用 --generateCodes 自动生成)`);
   }
 
   if (scanLogs.length > 0) {
@@ -192,18 +211,26 @@ function exportInspectionPackage(storage, opts) {
       scanTsv += `${formatDateTime(l.scannedAt)}\t${l.traceCode}\t${l.boxNo || ''}\t${l.note || ''}\n`;
     });
     fs.writeFileSync(scanTsvPath, scanTsv, 'utf-8');
-    printSuccess(`[8/9] 扫码记录清单 TSV: ${path.basename(scanTsvPath)} (${scanLogs.length}次扫码)`);
+    printSuccess(`[8/10] 扫码记录清单 TSV: ${path.basename(scanTsvPath)} (${scanLogs.length}次扫码)`);
   } else {
-    printInfo(`[8/9] 扫码记录清单: 暂无扫码记录`);
+    printInfo(`[8/10] 扫码记录清单: 暂无扫码记录`);
   }
 
-  const readme = generateClientSummary(summary, order, latestCodes, project, scanLogs);
+  // ── 质量预警摘要 (第9个文件) ──
+  const alertSummary = generateQualityAlertSummary(summary, order, inspections, riskHandlings, scanLogs, defectRanking);
+  const alertPath = path.join(outputDir, `quality-alert-summary-${orderNo}.txt`);
+  fs.writeFileSync(alertPath, alertSummary, 'utf-8');
+  printSuccess(`[9/10] 质量预警摘要: ${path.basename(alertPath)}`);
+
+  const readme = generateClientSummary(summary, order, latestCodes, project, scanLogs, riskHandlings);
   const readmePath = path.join(outputDir, '客户验货摘要.txt');
   fs.writeFileSync(readmePath, readme, 'utf-8');
-  printSuccess(`[9/9] 客户验货摘要: ${path.basename(readmePath)}`);
+  printSuccess(`[10/10] 客户验货摘要: ${path.basename(readmePath)}`);
 
   console.log();
   printSection('验货包汇总');
+  const statusMap = { PENDING: '🟣待处理', NOTIFIED: '🔵已通知组长', REINSPECTED: '🟡已复检', CLOSED: '🟢已关闭' };
+  const latestHandling = storage.findLatestRiskHandlingByOrder(orderNo);
   printTable(
     ['项目', '内容'],
     [
@@ -220,6 +247,7 @@ function exportInspectionPackage(storage, opts) {
       ['已包装件数', summary.packaging.totalQty],
       ['追溯码数', `${latestCodes.length}/${boxes.length}${latestCodes.length < boxes.length ? ' (有缺失!)' : ''}`],
       ['扫码查询次数', `${scanLogs.length} 次 (${summary.scanLogs.uniqueCodesScanned}个码被查过)`],
+      ['风险处置状态', `${latestHandling ? statusMap[latestHandling.status] + ' (处理人:' + (latestHandling.handledBy || '-') + ')' : '🟣待处理 (尚未登记)'} ${latestHandling?.note ? '\n  备注: "' + latestHandling.note + '"' : ''}`],
       ['输出目录', outputDir]
     ]
   );
@@ -334,7 +362,7 @@ function generateBatchTraceChainCSV(summary, materials, cuts, boxes, traceCodes)
   csv += '【第二部分: 裁剪床次关联 (Cutting Beds)】\n';
   csv += '床次号,关联面料缸号,层数,拉布匹数,裁剪件数,裁剪员,裁剪日期,关联订单\n';
   cuts.forEach(c => {
-    csv += `${c.bedNo},${c.fabricLot || '(未关联!)'},${c.layers || ''},${c.spreads || ''},${c.totalQty},${c.cutter || ''},${formatDate(c.cutDate)},${c.orderNo}\n`;
+    csv += `${c.bedNo},${c.fabricLot || '(未关联!)'},${c.layerCount || ''},${c.spreads || ''},${c.totalQty},${c.cutter || ''},${formatDate(c.cutDate)},${c.orderNo}\n`;
   });
   csv += '\n';
 
@@ -439,11 +467,13 @@ function generateReworkAnalysisCSV(summary, inspections, order) {
   return csv;
 }
 
-function generateClientSummary(s, order, codes, project, scanLogs) {
+function generateClientSummary(s, order, codes, project, scanLogs, riskHandlings) {
   const j = s.inspection.finalJudgment;
   const jCn = { PASS: '放行合格', REWORK: '需返工处理', REJECT: '不合格退货', PENDING: '待检验' }[j] || j;
   const jEmoji = { PASS: '✅', REWORK: '⚠️', REJECT: '❌', PENDING: '⏳' }[j] || '';
   scanLogs = scanLogs || [];
+  riskHandlings = riskHandlings || [];
+  const statusMap = { PENDING: '🟣 待处理', NOTIFIED: '🔵 已通知组长', REINSPECTED: '🟡 已复检', CLOSED: '🟢 已关闭' };
 
   let text = '';
   text += '╔' + '═'.repeat(62) + '╗\n';
@@ -509,7 +539,22 @@ function generateClientSummary(s, order, codes, project, scanLogs) {
   text += `  6. rework-analysis-${order.orderNo}.csv      返工率分析与质量评估\n`;
   text += `  7. trace-codes-${order.orderNo}.tsv          追溯码清单 (贴箱用)\n`;
   text += `  8. scan-logs-${order.orderNo}.tsv            扫码记录清单 (按时间倒序)\n`;
-  text += `  9. 客户验货摘要.txt                            本摘要文件\n\n`;
+  text += `  9. quality-alert-summary-${order.orderNo}.txt  质量预警摘要(风险/疵点/处置闭环)\n`;
+  text += `  10. 客户验货摘要.txt                           本摘要文件\n\n`;
+
+  if (riskHandlings.length > 0) {
+    const sortedRisks = riskHandlings.slice().sort((a, b) => new Date(b.handledAt) - new Date(a.handledAt));
+    const latest = sortedRisks[0];
+    text += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+    text += '  补充：风险处置闭环\n';
+    text += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+    text += `  当前最新状态:  ${statusMap[latest.status] || latest.status}\n`;
+    text += `  累计处置次数:  ${riskHandlings.length} 次\n`;
+    text += `  负责人:         ${latest.handledBy || '-'}\n`;
+    text += `  最近处理时间:  ${formatDateTime(latest.handledAt)}\n`;
+    if (latest.note) text += `  最近处理备注:  "${latest.note}"\n`;
+    text += '\n';
+  }
 
   if (scanLogs.length > 0) {
     const lastScan = scanLogs.slice().sort((a, b) => new Date(b.scannedAt) - new Date(a.scannedAt))[0];
@@ -549,6 +594,103 @@ function generateClientSummary(s, order, codes, project, scanLogs) {
   text += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
 
   return text;
+}
+
+function generateQualityAlertSummary(summary, order, inspections, riskHandlings, scanLogs, defectRanking) {
+  const statusMap = { PENDING: '🟣 待处理', NOTIFIED: '🔵 已通知组长', REINSPECTED: '🟡 已复检', CLOSED: '🟢 已关闭' };
+  const reworkRate = parseFloat(summary.qualityAlert?.overallReworkRate || summary.inspection.reworkRate || '0');
+  const rejectCount = summary.inspection.totalReject || 0;
+  const riskLevel = reworkRate >= 5 ? '🔴 高风险 (HIGH)' : reworkRate >= 3 ? '🟠 中高风险 (MEDIUM-HIGH)' : reworkRate >= 1 ? '🟡 观察级 (LOW)' : '🟢 良好 (GOOD)';
+
+  let t = '';
+  t += '╔' + '═'.repeat(62) + '╗\n';
+  t += '║' + ' '.repeat(20) + ' 质 量 预 警 摘 要 ' + ' '.repeat(20) + '║\n';
+  t += '╚' + '═'.repeat(62) + '╝\n\n';
+  t += `【适用】订单号: ${order.orderNo}  款号: ${order.styleNo}  客户: ${order.customer}\n\n`;
+
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  t += '  一、风险等级评估\n';
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  t += `  综合评级:        ${riskLevel}\n`;
+  t += `  整体返工率:      ${reworkRate.toFixed(2)}%  (阈值参考: 优秀<1% 正常<3% 预警<5% 严重≥5%)\n`;
+  t += `  累计退货数:      ${rejectCount} 件${rejectCount >= 5 ? '  ⚠️ 退货数偏高!' : ''}\n`;
+  t += `  质检覆盖:        ${inspections.length} 次质检 / ${summary.inspection.totalInspected} 件抽检 / 订单${order.qty}件\n`;
+  const minDt = summary.qualityAlert?.window?.inspectDateMin || (inspections.length > 0 ? formatDate(inspections[0].inspectDate) : '-');
+  const maxDt = summary.qualityAlert?.window?.inspectDateMax || (inspections.length > 0 ? formatDate(inspections[inspections.length - 1].inspectDate) : '-');
+  t += `  质检日期跨度:    ${minDt}  ~  ${maxDt}\n\n`;
+
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  t += '  二、主要疵点分布 (Top 5)\n';
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  if (defectRanking.length === 0) {
+    t += '  (无疵点记录)\n';
+  } else {
+    defectRanking.slice(0, 5).forEach((d, i) => {
+      const bar = '█'.repeat(Math.min(20, Math.round(parseFloat(d.ratio) / 5)));
+      t += `  ${i + 1}. ${d.type.padEnd(10)} ${String(d.count).padStart(4)}件  占比 ${d.ratio.padStart(5)}  ${bar}\n`;
+    });
+  }
+  t += '\n';
+
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  t += '  三、返工 & 退货趋势 (按质检批次)\n';
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  const sortedInsp = inspections.slice().sort((a, b) => new Date(a.inspectDate) - new Date(b.inspectDate));
+  const jMap = { PASS: '✅放行', REWORK: '⚠️返工', REJECT: '❌退货', PENDING: '⏳待检' };
+  sortedInsp.forEach((i, idx) => {
+    const r = i.inspectedQty > 0 ? ((i.reworkQty / i.inspectedQty) * 100).toFixed(1) + '%' : '0%';
+    t += `  第${String(idx + 1).padStart(2)}次  ${formatDate(i.inspectDate)}  ${(i.inspector || '-').padEnd(6)}  抽${String(i.inspectedQty).padStart(4)}  返${String(i.reworkQty).padStart(3)}  退${String(i.rejectQty).padStart(3)}  返工率 ${r.padStart(6)}  ${jMap[i.judgment] || i.judgment}\n`;
+  });
+  t += '\n';
+
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  t += '  四、风险处置闭环\n';
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  if (riskHandlings.length === 0) {
+    t += '  🟣 当前状态: 待处理 (尚未登记处置)\n';
+    t += '  建议操作: gt query --alert --handleStatus NOTIFIED --orderNo ' + order.orderNo + ' --handleBy <负责人> --handleNote "备注"\n';
+  } else {
+    const sorted = riskHandlings.slice().sort((a, b) => new Date(b.handledAt) - new Date(a.handledAt));
+    const latest = sorted[0];
+    t += `  当前最新: ${statusMap[latest.status] || latest.status}\n`;
+    t += `  累计处置: ${riskHandlings.length} 次登记\n`;
+    t += `  负责人:     ${latest.handledBy || '-'}\n`;
+    t += `  最近时间:   ${formatDateTime(latest.handledAt)}\n`;
+    if (latest.note) t += `  最近备注:   "${latest.note}"\n`;
+    if (sorted.length > 1) {
+      t += `  历史记录 (最近${Math.min(8, sorted.length - 1)}条):\n`;
+      sorted.slice(1, 9).forEach(r => {
+        t += `    · ${formatDate(r.handledAt)}  ${statusMap[r.status] || r.status}  ${r.handledBy || '-'}  ${r.note ? '"' + r.note + '"' : ''}\n`;
+      });
+    }
+  }
+  t += '\n';
+
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  t += '  五、扫码追溯记录 (只含本订单)\n';
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  if (scanLogs.length === 0) {
+    t += '  (本订单暂无扫码记录)\n';
+  } else {
+    const uniqueCodes = [...new Set(scanLogs.map(l => l.traceCode))].length;
+    t += `  累计扫码次数:   ${scanLogs.length} 次\n`;
+    t += `  已被查询箱数:   ${uniqueCodes} 箱\n`;
+    t += `  总箱数/覆盖:    ${summary.packaging.totalBoxes} 箱 / ${summary.packaging.totalBoxes > 0 ? ((uniqueCodes / summary.packaging.totalBoxes) * 100).toFixed(0) : 0}%\n`;
+    const lastScan = scanLogs.slice().sort((a, b) => new Date(b.scannedAt) - new Date(a.scannedAt))[0];
+    t += `  最近一次扫码:   ${formatDateTime(lastScan.scannedAt)}  ${lastScan.note ? '(' + lastScan.note + ')' : ''}\n`;
+    t += `  扫码明细 (最近10条,倒序):\n`;
+    scanLogs.slice().sort((a, b) => new Date(b.scannedAt) - new Date(a.scannedAt)).slice(0, 10).forEach((l, i) => {
+      t += `    ${String(i + 1).padStart(2)}. ${formatDateTime(l.scannedAt)}  ${l.boxNo || '-'.padEnd(16)}  ${l.note || '(无备注)'}\n`;
+    });
+  }
+  t += '\n';
+
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  t += `  摘要生成时间: ${formatDateTime(new Date())}\n`;
+  t += '  本摘要由 服装质检追溯器 (Garment Trace) 自动生成\n';
+  t += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+
+  return t;
 }
 
 function validateRecords(storage, orderNo) {
@@ -892,7 +1034,7 @@ function printHelp() {
   --output <目录>           输出目录 (默认: 项目根目录下)
   --generateCodes           如无追溯码则自动生成并绑定
 
-  👉 生成的资料包内包含 9 个文件:
+  👉 生成的资料包内包含 10 个文件:
      1. inspection-report-*.json  完整数据 (系统对接用)
      2. inspection-report-*.csv   检验报告 (Excel打开)
      3. packing-list-*.csv        装箱单 (每箱明细)
@@ -901,7 +1043,8 @@ function printHelp() {
      6. rework-analysis-*.csv     返工率分析与质量等级
      7. trace-codes-*.tsv         追溯码清单 (贴箱用)
      8. scan-logs-*.tsv           扫码记录清单 (按时间倒序)
-     9. 客户验货摘要.txt          给客户看的专业文字摘要
+     9. quality-alert-summary-*.txt  质量预警摘要(风险+疵点+处置+扫码)
+     10. 客户验货摘要.txt         给客户看的专业文字摘要
 
 🏷 追溯码管理:
   --traceCodes              生成/导出追溯码列表

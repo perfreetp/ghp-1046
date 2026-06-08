@@ -1,6 +1,6 @@
 [
   {
-    "id": "SEW-MQ5JYYDSDOEPW6",
+    "id": "SEW-MQ5KOKSPDL99J6",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "groupNo": "1",
@@ -23,10 +23,10 @@
     "bundleQty": 12,
     "process": "缝制",
     "remark": "",
-    "recordedAt": "2026-06-08T18:37:05.297Z"
+    "recordedAt": "2026-06-08T18:57:00.745Z"
   },
   {
-    "id": "SEW-MQ5JYYGF73H6U5",
+    "id": "SEW-MQ5KOKVGPC56FK",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "groupNo": "2",
@@ -49,10 +49,10 @@
     "bundleQty": 0,
     "process": "缝制",
     "remark": "",
-    "recordedAt": "2026-06-08T18:37:05.391Z"
+    "recordedAt": "2026-06-08T18:57:00.844Z"
   },
   {
-    "id": "SEW-MQ5JYYJ1Z8VH27",
+    "id": "SEW-MQ5KOKXXAL8JOI",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "groupNo": "1",
@@ -61,15 +61,15 @@
     "assignedQty": 0,
     "completedQty": 2500,
     "defectQty": 12,
-    "startDate": "2026-06-08T18:37:05.485Z",
+    "startDate": "2026-06-08T18:57:00.934Z",
     "endDate": "2026-06-18T00:00:00.000Z",
     "bundleQty": 0,
     "process": "缝制",
     "remark": "",
-    "recordedAt": "2026-06-08T18:37:05.486Z"
+    "recordedAt": "2026-06-08T18:57:00.934Z"
   },
   {
-    "id": "SEW-MQ5JYYLPJF4ECJ",
+    "id": "SEW-MQ5KOL0FL67PJ5",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "groupNo": "2",
@@ -78,15 +78,15 @@
     "assignedQty": 0,
     "completedQty": 2480,
     "defectQty": 20,
-    "startDate": "2026-06-08T18:37:05.581Z",
+    "startDate": "2026-06-08T18:57:01.023Z",
     "endDate": "2026-06-19T00:00:00.000Z",
     "bundleQty": 0,
     "process": "缝制",
     "remark": "",
-    "recordedAt": "2026-06-08T18:37:05.581Z"
+    "recordedAt": "2026-06-08T18:57:01.024Z"
   },
   {
-    "id": "SEW-MQ5JYYOALVDCUH",
+    "id": "SEW-MQ5KOL34SRQP6K",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "groupNo": "0",
@@ -94,11 +94,11 @@
     "ironDate": "2026-06-20T00:00:00.000Z",
     "ironedBy": "陈师傅,马师傅",
     "ironQty": 4980,
-    "recordedAt": "2026-06-08T18:37:05.674Z",
+    "recordedAt": "2026-06-08T18:57:01.120Z",
     "packDate": "2026-06-21T00:00:00.000Z",
     "packedBy": "王霞,周敏,刘芳",
     "packQty": 4980,
     "boxCount": 208,
-    "updatedAt": "2026-06-08T18:37:05.766Z"
+    "updatedAt": "2026-06-08T18:57:01.211Z"
   }
 ]

@@ -14,7 +14,8 @@ class Storage {
       inspections: path.join(this.dataDir, 'inspections.json'),
       boxes: path.join(this.dataDir, 'boxes.json'),
       traceCodes: path.join(this.dataDir, 'trace-codes.json'),
-      scanLogs: path.join(this.dataDir, 'scan-logs.json')
+      scanLogs: path.join(this.dataDir, 'scan-logs.json'),
+      riskHandlings: path.join(this.dataDir, 'risk-handlings.json')
     };
   }
 
@@ -227,6 +228,40 @@ class Storage {
 
   findScanLogsByBox(boxNo) {
     return this.getScanLogs().filter(l => l.boxNo === boxNo);
+  }
+
+  getRiskHandlings() {
+    return this.readFile(this.files.riskHandlings, []);
+  }
+
+  saveRiskHandlings(records) {
+    this.writeFile(this.files.riskHandlings, records);
+  }
+
+  addRiskHandling(record) {
+    const records = this.getRiskHandlings();
+    records.push(record);
+    this.saveRiskHandlings(records);
+  }
+
+  findRiskHandlingsByOrder(orderNo) {
+    return this.getRiskHandlings().filter(r => r.orderNo === orderNo);
+  }
+
+  findLatestRiskHandlingByOrder(orderNo) {
+    const list = this.findRiskHandlingsByOrder(orderNo).sort((a, b) => new Date(b.handledAt) - new Date(a.handledAt));
+    return list.length > 0 ? list[0] : null;
+  }
+
+  getAllLatestRiskHandlings() {
+    const map = {};
+    this.getRiskHandlings().forEach(r => {
+      const existing = map[r.orderNo];
+      if (!existing || new Date(r.handledAt) > new Date(existing.handledAt)) {
+        map[r.orderNo] = r;
+      }
+    });
+    return map;
   }
 }
 

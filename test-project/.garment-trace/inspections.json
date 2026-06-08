@@ -1,6 +1,6 @@
 [
   {
-    "id": "INS-MQ5JYZBMLD6LZW",
+    "id": "INS-MQ5KOLQR9MDZI0",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "boxNo": "JXA001-6001-0001",
@@ -18,10 +18,10 @@
     "judgment": "REWORK",
     "level": "AQL2.5",
     "remark": "",
-    "recordedAt": "2026-06-08T18:37:06.515Z"
+    "recordedAt": "2026-06-08T18:57:01.972Z"
   },
   {
-    "id": "INS-MQ5JYZEC2T7LCR",
+    "id": "INS-MQ5KOLTN1JNI83",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "boxNo": "JXA001-6001-0002",
@@ -37,10 +37,10 @@
     "judgment": "PASS",
     "level": "AQL2.5",
     "remark": "",
-    "recordedAt": "2026-06-08T18:37:06.612Z"
+    "recordedAt": "2026-06-08T18:57:02.076Z"
   },
   {
-    "id": "INS-MQ5JYZH0ZL2OBO",
+    "id": "INS-MQ5KOLWCPY4IQT",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "boxNo": "JXA001-6001-0003",
@@ -60,10 +60,10 @@
     "judgment": "REWORK",
     "level": "AQL2.5",
     "remark": "",
-    "recordedAt": "2026-06-08T18:37:06.708Z"
+    "recordedAt": "2026-06-08T18:57:02.172Z"
   },
   {
-    "id": "INS-MQ5JYZJQ75U8F9",
+    "id": "INS-MQ5KOLZ7HZ8A2B",
     "orderNo": "PO2026001",
     "styleNo": "JX-A001",
     "boxNo": "",
@@ -85,6 +85,6 @@
     "judgment": "REWORK",
     "level": "AQL2.5",
     "remark": "生产中抽检",
-    "recordedAt": "2026-06-08T18:37:06.807Z"
+    "recordedAt": "2026-06-08T18:57:02.275Z"
   }
 ]
