@@ -1,0 +1,49 @@
+[
+  {
+    "id": "CUT-MQ5J8PAJ1MANH7",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "bedNo": "1",
+    "layerCount": 200,
+    "spreads": 10,
+    "totalQty": 2000,
+    "sizes": {
+      "S": 400,
+      "M": 600,
+      "L": 750,
+      "XL": 250
+    },
+    "fabricLot": "DYE20260608A",
+    "cutter": "张师傅",
+    "cutDate": "2026-06-10T00:00:00.000Z",
+    "markerLength": 12.5,
+    "markerWidth": 1.85,
+    "fabricUsage": 1480.5,
+    "remark": "",
+    "recordedAt": "2026-06-08T18:16:40.460Z"
+  },
+  {
+    "id": "CUT-MQ5J8PDC37H1FB",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "bedNo": "2",
+    "layerCount": 200,
+    "spreads": 15,
+    "totalQty": 3000,
+    "sizes": {
+      "S": 400,
+      "M": 600,
+      "L": 750,
+      "XL": 750,
+      "XXL": 500
+    },
+    "fabricLot": "DYE20260608A",
+    "cutter": "李师傅",
+    "cutDate": "2026-06-11T00:00:00.000Z",
+    "markerLength": 0,
+    "markerWidth": 0,
+    "fabricUsage": 2220.3,
+    "remark": "",
+    "recordedAt": "2026-06-08T18:16:40.560Z"
+  }
+]

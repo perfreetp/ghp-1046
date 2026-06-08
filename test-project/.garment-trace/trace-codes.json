@@ -1,0 +1,29 @@
+[
+  {
+    "code": "GT-FE98E52ED07AD9BF",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "boxNo": "JXA001-6001-0001",
+    "type": "BOX",
+    "createdAt": "2026-06-08T18:16:41.680Z",
+    "scanned": false
+  },
+  {
+    "code": "GT-1B44D6E5C0A3BB12",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "boxNo": "JXA001-6001-0002",
+    "type": "BOX",
+    "createdAt": "2026-06-08T18:16:41.777Z",
+    "scanned": false
+  },
+  {
+    "code": "GT-B8647DFA69C0C223",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "boxNo": "JXA001-6001-0003",
+    "type": "BOX",
+    "createdAt": "2026-06-08T18:16:41.870Z",
+    "scanned": false
+  }
+]

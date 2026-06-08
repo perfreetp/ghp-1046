@@ -1,0 +1,90 @@
+[
+  {
+    "id": "INS-MQ5J8QJ4J91CNI",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "boxNo": "JXA001-6001-0001",
+    "batchNo": "",
+    "inspector": "王质检",
+    "inspectDate": "2026-06-22T00:00:00.000Z",
+    "inspectedQty": 24,
+    "passQty": 23,
+    "reworkQty": 1,
+    "rejectQty": 0,
+    "defects": {
+      "线头未清": 1
+    },
+    "defectTotal": 1,
+    "judgment": "REWORK",
+    "level": "AQL2.5",
+    "remark": "",
+    "recordedAt": "2026-06-08T18:16:42.064Z"
+  },
+  {
+    "id": "INS-MQ5J8QLPT0ZP1N",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "boxNo": "JXA001-6001-0002",
+    "batchNo": "",
+    "inspector": "王质检",
+    "inspectDate": "2026-06-22T00:00:00.000Z",
+    "inspectedQty": 24,
+    "passQty": 24,
+    "reworkQty": 0,
+    "rejectQty": 0,
+    "defects": {},
+    "defectTotal": 0,
+    "judgment": "PASS",
+    "level": "AQL2.5",
+    "remark": "",
+    "recordedAt": "2026-06-08T18:16:42.158Z"
+  },
+  {
+    "id": "INS-MQ5J8QO8N9EA5M",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "boxNo": "JXA001-6001-0003",
+    "batchNo": "",
+    "inspector": "李质检",
+    "inspectDate": "2026-06-22T00:00:00.000Z",
+    "inspectedQty": 24,
+    "passQty": 21,
+    "reworkQty": 2,
+    "rejectQty": 1,
+    "defects": {
+      "污渍": 1,
+      "跳线": 1,
+      "破洞": 1
+    },
+    "defectTotal": 3,
+    "judgment": "REWORK",
+    "level": "AQL2.5",
+    "remark": "",
+    "recordedAt": "2026-06-08T18:16:42.248Z"
+  },
+  {
+    "id": "INS-MQ5J8QQSHAS68U",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "boxNo": "",
+    "batchNo": "",
+    "inspector": "王质检",
+    "inspectDate": "2026-06-23T00:00:00.000Z",
+    "inspectedQty": 500,
+    "passQty": 486,
+    "reworkQty": 12,
+    "rejectQty": 2,
+    "defects": {
+      "跳线": 4,
+      "污渍": 3,
+      "线头未清": 3,
+      "色差": 1,
+      "尺寸超差": 1
+    },
+    "defectTotal": 12,
+    "judgment": "REWORK",
+    "level": "AQL2.5",
+    "remark": "生产中抽检",
+    "recordedAt": "2026-06-08T18:16:42.340Z"
+  }
+]

@@ -1,0 +1,437 @@
+{
+  "project": {
+    "name": "测试工厂2026",
+    "factory": "锦绣制衣厂",
+    "code": "",
+    "contact": "",
+    "phone": "",
+    "address": ""
+  },
+  "order": {
+    "id": "ORD-MQ5J8OC67SH5FD",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "styleName": "男士圆领短袖T恤",
+    "customer": "优衣库",
+    "customerPo": "UNIQLO-2026-PO001",
+    "qty": 5000,
+    "unitPrice": 25.5,
+    "color": "白色",
+    "sizeRange": "S-XXL",
+    "sizes": {
+      "S": 800,
+      "M": 1200,
+      "L": 1500,
+      "XL": 1000,
+      "XXL": 500
+    },
+    "deliveryDate": "2026-08-15T00:00:00.000Z",
+    "orderDate": "2026-06-01T00:00:00.000Z",
+    "season": "2026SS",
+    "remark": "经典款圆领T恤",
+    "status": "REWORKING",
+    "amount": 127500
+  },
+  "materials": [
+    {
+      "orderNo": "PO2026001",
+      "styleNo": "JX-A001",
+      "type": "面料",
+      "category": "主料",
+      "name": "精梳棉汗布40支",
+      "code": "FB-001W",
+      "color": "白色",
+      "lotNo": "DYE20260608A",
+      "batchNo": "",
+      "supplier": "华纺纺织",
+      "qty": 3500,
+      "unit": "米",
+      "receivedDate": "2026-06-08T18:16:39.702Z",
+      "inspectionResult": "PASS",
+      "remark": ""
+    },
+    {
+      "orderNo": "PO2026001",
+      "styleNo": "JX-A001",
+      "type": "面料",
+      "category": "罗纹",
+      "name": "圆领罗纹",
+      "code": "FB-001R",
+      "color": "白色",
+      "lotNo": "DYE20260608B",
+      "batchNo": "",
+      "supplier": "华纺纺织",
+      "qty": 320,
+      "unit": "米",
+      "receivedDate": "2026-06-08T18:16:39.792Z",
+      "inspectionResult": "PENDING",
+      "remark": ""
+    },
+    {
+      "orderNo": "PO2026001",
+      "styleNo": "JX-A001",
+      "type": "辅料",
+      "category": "拉链",
+      "name": "3号隐形拉链",
+      "code": "ACC-Z003",
+      "color": "白色",
+      "lotNo": "",
+      "batchNo": "B20260605-Z",
+      "supplier": "YKK",
+      "qty": 5200,
+      "unit": "条",
+      "receivedDate": "2026-06-08T18:16:39.887Z",
+      "inspectionResult": "PENDING",
+      "remark": ""
+    },
+    {
+      "orderNo": "PO2026001",
+      "styleNo": "JX-A001",
+      "type": "辅料",
+      "category": "织唛",
+      "name": "主唛织标",
+      "code": "ACC-L001",
+      "color": "白色",
+      "lotNo": "",
+      "batchNo": "B20260606-L",
+      "supplier": "华丽织标",
+      "qty": 5100,
+      "unit": "个",
+      "receivedDate": "2026-06-08T18:16:39.984Z",
+      "inspectionResult": "PENDING",
+      "remark": ""
+    },
+    {
+      "orderNo": "PO2026001",
+      "styleNo": "JX-A001",
+      "type": "辅料",
+      "category": "吊牌",
+      "name": "合格证吊牌",
+      "code": "ACC-T001",
+      "color": "白色",
+      "lotNo": "",
+      "batchNo": "B20260606-T",
+      "supplier": "金辉印刷",
+      "qty": 5100,
+      "unit": "个",
+      "receivedDate": "2026-06-08T18:16:40.073Z",
+      "inspectionResult": "PENDING",
+      "remark": ""
+    }
+  ],
+  "cuttingSummary": {
+    "totalBeds": 2,
+    "totalQty": 5000,
+    "cutters": [
+      "张师傅",
+      "李师傅"
+    ],
+    "beds": [
+      {
+        "bedNo": "1",
+        "fabricLot": "DYE20260608A",
+        "spreads": 10,
+        "totalQty": 2000,
+        "cutter": "张师傅",
+        "cutDate": "2026-06-10T00:00:00.000Z"
+      },
+      {
+        "bedNo": "2",
+        "fabricLot": "DYE20260608A",
+        "spreads": 15,
+        "totalQty": 3000,
+        "cutter": "李师傅",
+        "cutDate": "2026-06-11T00:00:00.000Z"
+      }
+    ]
+  },
+  "sewingSummary": {
+    "groups": [
+      {
+        "groupNo": "1",
+        "leader": "李组长",
+        "members": 8,
+        "assigned": 2500,
+        "completed": 0,
+        "defects": 0
+      },
+      {
+        "groupNo": "2",
+        "leader": "陈组长",
+        "members": 8,
+        "assigned": 2500,
+        "completed": 0,
+        "defects": 0
+      },
+      {
+        "groupNo": "1",
+        "leader": "",
+        "members": 0,
+        "assigned": 0,
+        "completed": 2500,
+        "defects": 12
+      },
+      {
+        "groupNo": "2",
+        "leader": "",
+        "members": 0,
+        "assigned": 0,
+        "completed": 2480,
+        "defects": 20
+      }
+    ],
+    "ironPack": {
+      "id": "SEW-MQ5J8PVF0HIBGL",
+      "orderNo": "PO2026001",
+      "styleNo": "JX-A001",
+      "groupNo": "0",
+      "process": "整烫包装",
+      "ironDate": "2026-06-20T00:00:00.000Z",
+      "ironedBy": "陈师傅,马师傅",
+      "ironQty": 4980,
+      "recordedAt": "2026-06-08T18:16:41.211Z",
+      "packDate": "2026-06-21T00:00:00.000Z",
+      "packedBy": "王霞,周敏,刘芳",
+      "packQty": 4980,
+      "boxCount": 208,
+      "updatedAt": "2026-06-08T18:16:41.300Z"
+    }
+  },
+  "inspection": {
+    "totalInspections": 4,
+    "totalInspected": 572,
+    "totalRework": 15,
+    "totalPass": 554,
+    "totalReject": 3,
+    "reworkRate": 2.62,
+    "finalJudgment": "REWORK",
+    "records": [
+      {
+        "orderNo": "PO2026001",
+        "styleNo": "JX-A001",
+        "boxNo": "JXA001-6001-0001",
+        "batchNo": "",
+        "inspector": "王质检",
+        "inspectDate": "2026-06-22T00:00:00.000Z",
+        "inspectedQty": 24,
+        "passQty": 23,
+        "reworkQty": 1,
+        "rejectQty": 0,
+        "defects": {
+          "线头未清": 1
+        },
+        "defectTotal": 1,
+        "judgment": "REWORK",
+        "level": "AQL2.5",
+        "remark": ""
+      },
+      {
+        "orderNo": "PO2026001",
+        "styleNo": "JX-A001",
+        "boxNo": "JXA001-6001-0002",
+        "batchNo": "",
+        "inspector": "王质检",
+        "inspectDate": "2026-06-22T00:00:00.000Z",
+        "inspectedQty": 24,
+        "passQty": 24,
+        "reworkQty": 0,
+        "rejectQty": 0,
+        "defects": {},
+        "defectTotal": 0,
+        "judgment": "PASS",
+        "level": "AQL2.5",
+        "remark": ""
+      },
+      {
+        "orderNo": "PO2026001",
+        "styleNo": "JX-A001",
+        "boxNo": "JXA001-6001-0003",
+        "batchNo": "",
+        "inspector": "李质检",
+        "inspectDate": "2026-06-22T00:00:00.000Z",
+        "inspectedQty": 24,
+        "passQty": 21,
+        "reworkQty": 2,
+        "rejectQty": 1,
+        "defects": {
+          "污渍": 1,
+          "跳线": 1,
+          "破洞": 1
+        },
+        "defectTotal": 3,
+        "judgment": "REWORK",
+        "level": "AQL2.5",
+        "remark": ""
+      },
+      {
+        "orderNo": "PO2026001",
+        "styleNo": "JX-A001",
+        "boxNo": "",
+        "batchNo": "",
+        "inspector": "王质检",
+        "inspectDate": "2026-06-23T00:00:00.000Z",
+        "inspectedQty": 500,
+        "passQty": 486,
+        "reworkQty": 12,
+        "rejectQty": 2,
+        "defects": {
+          "跳线": 4,
+          "污渍": 3,
+          "线头未清": 3,
+          "色差": 1,
+          "尺寸超差": 1
+        },
+        "defectTotal": 12,
+        "judgment": "REWORK",
+        "level": "AQL2.5",
+        "remark": "生产中抽检"
+      }
+    ],
+    "defectRanking": [
+      {
+        "type": "跳线",
+        "count": 5,
+        "ratio": "31.3%"
+      },
+      {
+        "type": "线头未清",
+        "count": 4,
+        "ratio": "25.0%"
+      },
+      {
+        "type": "污渍",
+        "count": 4,
+        "ratio": "25.0%"
+      },
+      {
+        "type": "破洞",
+        "count": 1,
+        "ratio": "6.3%"
+      },
+      {
+        "type": "色差",
+        "count": 1,
+        "ratio": "6.3%"
+      },
+      {
+        "type": "尺寸超差",
+        "count": 1,
+        "ratio": "6.3%"
+      }
+    ]
+  },
+  "packaging": {
+    "totalBoxes": 3,
+    "totalQty": 72,
+    "totalGW": 55.7,
+    "totalNW": 48.8,
+    "boxes": [
+      {
+        "boxNo": "JXA001-6001-0001",
+        "orderNo": "PO2026001",
+        "styleNo": "JX-A001",
+        "sequence": "1",
+        "customer": "优衣库",
+        "color": "白色",
+        "sizes": {
+          "S": 6,
+          "M": 6,
+          "L": 6,
+          "XL": 6
+        },
+        "qty": 24,
+        "grossWeight": 18.5,
+        "netWeight": 16.2,
+        "measure": "60x40x30",
+        "sealNo": "SL000001",
+        "palletNo": "PLT-A01",
+        "packedBy": "王霞",
+        "packDate": "2026-06-21T00:00:00.000Z",
+        "status": "PACKED",
+        "remark": ""
+      },
+      {
+        "boxNo": "JXA001-6001-0002",
+        "orderNo": "PO2026001",
+        "styleNo": "JX-A001",
+        "sequence": "2",
+        "customer": "优衣库",
+        "color": "白色",
+        "sizes": {
+          "S": 6,
+          "M": 6,
+          "L": 6,
+          "XL": 6
+        },
+        "qty": 24,
+        "grossWeight": 18.4,
+        "netWeight": 16.1,
+        "measure": "60x40x30",
+        "sealNo": "SL000002",
+        "palletNo": "",
+        "packedBy": "",
+        "packDate": "2026-06-08T18:16:41.774Z",
+        "status": "PACKED",
+        "remark": ""
+      },
+      {
+        "boxNo": "JXA001-6001-0003",
+        "orderNo": "PO2026001",
+        "styleNo": "JX-A001",
+        "sequence": "3",
+        "customer": "优衣库",
+        "color": "白色",
+        "sizes": {
+          "M": 6,
+          "L": 6,
+          "XL": 6,
+          "XXL": 6
+        },
+        "qty": 24,
+        "grossWeight": 18.8,
+        "netWeight": 16.5,
+        "measure": "60x40x30",
+        "sealNo": "SL000003",
+        "palletNo": "",
+        "packedBy": "",
+        "packDate": "2026-06-08T18:16:41.867Z",
+        "status": "PACKED",
+        "remark": ""
+      }
+    ]
+  },
+  "traceability": {
+    "totalTraceCodes": 3,
+    "traceCodes": [
+      {
+        "code": "GT-FE98E52ED07AD9BF",
+        "orderNo": "PO2026001",
+        "styleNo": "JX-A001",
+        "boxNo": "JXA001-6001-0001",
+        "type": "BOX",
+        "createdAt": "2026-06-08T18:16:41.680Z",
+        "scanned": false
+      },
+      {
+        "code": "GT-1B44D6E5C0A3BB12",
+        "orderNo": "PO2026001",
+        "styleNo": "JX-A001",
+        "boxNo": "JXA001-6001-0002",
+        "type": "BOX",
+        "createdAt": "2026-06-08T18:16:41.777Z",
+        "scanned": false
+      },
+      {
+        "code": "GT-B8647DFA69C0C223",
+        "orderNo": "PO2026001",
+        "styleNo": "JX-A001",
+        "boxNo": "JXA001-6001-0003",
+        "type": "BOX",
+        "createdAt": "2026-06-08T18:16:41.870Z",
+        "scanned": false
+      }
+    ],
+    "missingTraceCodeBoxes": []
+  },
+  "generatedAt": "2026-06-08T18:16:43.709Z"
+}

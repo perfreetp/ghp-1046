@@ -1,0 +1,83 @@
+[
+  {
+    "id": "ORD-MQ5J8OC67SH5FD",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "styleName": "男士圆领短袖T恤",
+    "customer": "优衣库",
+    "customerPo": "UNIQLO-2026-PO001",
+    "qty": 5000,
+    "unitPrice": 25.5,
+    "color": "白色",
+    "sizeRange": "S-XXL",
+    "sizes": {
+      "S": 800,
+      "M": 1200,
+      "L": 1500,
+      "XL": 1000,
+      "XXL": 500
+    },
+    "deliveryDate": "2026-08-15T00:00:00.000Z",
+    "orderDate": "2026-06-01T00:00:00.000Z",
+    "season": "2026SS",
+    "remark": "经典款圆领T恤",
+    "status": "REWORKING",
+    "createdAt": "2026-06-08T18:16:39.223Z",
+    "updatedAt": "2026-06-08T18:16:42.250Z",
+    "amount": 127500
+  },
+  {
+    "id": "ORD-MQ5J8OF03CMU4F",
+    "orderNo": "PO2026002",
+    "styleNo": "JX-B002",
+    "styleName": "女士收腰连衣裙",
+    "customer": "HM",
+    "customerPo": "HM-SUM-0892",
+    "qty": 3000,
+    "unitPrice": 68,
+    "color": "碎花",
+    "sizeRange": "S-XL",
+    "sizes": {
+      "S": 600,
+      "M": 900,
+      "L": 1000,
+      "XL": 500
+    },
+    "deliveryDate": "2026-07-30T00:00:00.000Z",
+    "orderDate": "2026-06-05T00:00:00.000Z",
+    "season": "2026SS",
+    "remark": "雪纺碎花连衣裙",
+    "status": "CREATED",
+    "createdAt": "2026-06-08T18:16:39.325Z",
+    "updatedAt": "2026-06-08T18:16:39.518Z",
+    "amount": 204000
+  },
+  {
+    "id": "ORD-MQ5J8OHL3RDPH2",
+    "orderNo": "PO2026003",
+    "styleNo": "JX-C003",
+    "styleName": "儿童纯棉卫衣套装",
+    "customer": "西松屋",
+    "customerPo": "NISHI-26-055",
+    "qty": 8000,
+    "unitPrice": 42,
+    "color": "藏青",
+    "sizeRange": "90-140",
+    "sizes": {
+      "90": 1500,
+      "100": 1800,
+      "110": 1800,
+      "120": 1500,
+      "130": 1000,
+      "140": 400
+    },
+    "deliveryDate": "2026-08-10T00:00:00.000Z",
+    "orderDate": "2026-06-08T00:00:00.000Z",
+    "season": "2026AW",
+    "remark": "秋冬毛圈套装",
+    "status": "CREATED",
+    "createdAt": "2026-06-08T18:16:39.417Z",
+    "updatedAt": "2026-06-08T18:16:39.519Z",
+    "amount": 336000
+  }
+]

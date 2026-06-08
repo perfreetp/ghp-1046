@@ -1,0 +1,77 @@
+[
+  {
+    "id": "BOX-MQ5J8Q8EU9M4TL",
+    "boxNo": "JXA001-6001-0001",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "sequence": "1",
+    "customer": "优衣库",
+    "color": "白色",
+    "sizes": {
+      "S": 6,
+      "M": 6,
+      "L": 6,
+      "XL": 6
+    },
+    "qty": 24,
+    "grossWeight": 18.5,
+    "netWeight": 16.2,
+    "measure": "60x40x30",
+    "sealNo": "SL000001",
+    "palletNo": "PLT-A01",
+    "packedBy": "王霞",
+    "packDate": "2026-06-21T00:00:00.000Z",
+    "status": "PACKED",
+    "remark": ""
+  },
+  {
+    "id": "BOX-MQ5J8QB2BH9KGC",
+    "boxNo": "JXA001-6001-0002",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "sequence": "2",
+    "customer": "优衣库",
+    "color": "白色",
+    "sizes": {
+      "S": 6,
+      "M": 6,
+      "L": 6,
+      "XL": 6
+    },
+    "qty": 24,
+    "grossWeight": 18.4,
+    "netWeight": 16.1,
+    "measure": "60x40x30",
+    "sealNo": "SL000002",
+    "palletNo": "",
+    "packedBy": "",
+    "packDate": "2026-06-08T18:16:41.774Z",
+    "status": "PACKED",
+    "remark": ""
+  },
+  {
+    "id": "BOX-MQ5J8QDN4SKBDM",
+    "boxNo": "JXA001-6001-0003",
+    "orderNo": "PO2026001",
+    "styleNo": "JX-A001",
+    "sequence": "3",
+    "customer": "优衣库",
+    "color": "白色",
+    "sizes": {
+      "M": 6,
+      "L": 6,
+      "XL": 6,
+      "XXL": 6
+    },
+    "qty": 24,
+    "grossWeight": 18.8,
+    "netWeight": 16.5,
+    "measure": "60x40x30",
+    "sealNo": "SL000003",
+    "palletNo": "",
+    "packedBy": "",
+    "packDate": "2026-06-08T18:16:41.867Z",
+    "status": "PACKED",
+    "remark": ""
+  }
+]
